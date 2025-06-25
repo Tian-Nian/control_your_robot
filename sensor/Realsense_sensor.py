@@ -131,12 +131,10 @@ class RealsenseSensor(VisionSensor):
         except Exception as e:
             print(f"Error during cleanup: {str(e)}")
     def cleanup_mp(self):
-        # 安全停止线程
         self.exit_event.set()
         self.keep_running = False
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=2.0)
-        # 停止pipeline
         if hasattr(self, 'pipeline'):
             self.pipeline.stop()
     def __del__(self):
