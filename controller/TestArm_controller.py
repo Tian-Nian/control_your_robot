@@ -33,7 +33,7 @@ class TestArmController(ArmController):
         state["joint"] = np.random.rand(self.DoFs) * 3.1515926
         state["qpos"] = np.random.rand(6)
         state["gripper"] = np.random.rand(1)
-        debug_print(self.name, f"get state to \n {state}", self.INFO)
+        # debug_print(self.name, f"get state to \n {state}", self.INFO)
         return state
 
     def set_position(self, position):
@@ -52,13 +52,14 @@ class TestArmController(ArmController):
 
     # The input gripper value is in the range [0, 1], representing the degree of opening.
     def set_gripper(self, gripper):
-        if isinstance(gripper, (int, float, complex)) and not isinstance(gripper, bool):
-            if 1>gripper > 0:
+        if isinstance(gripper, (int, float, complex,np.ndarray)) and not isinstance(gripper, bool):
+            if 1> gripper > 0:
                 debug_print(self.name, f"set gripper to {gripper}", self.INFO)
             else:
                 debug_print(self.name, f"gripper better be 0~1, but get number {gripper}","WARNING")
         else:
-            debug_print(self.name, f"gripper should be a number 0~1","ERROR")
+            print(gripper.ndim)
+            debug_print(self.name, f"gripper should be a number 0~1, but get type {type(gripper)}","ERROR")
     
     def __del__(self):
         try:

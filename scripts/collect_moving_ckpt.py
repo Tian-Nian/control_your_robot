@@ -7,11 +7,12 @@ import time
 import select
 import numpy as np
 
-from my_robot.agilex_piper_single import PiperSingle
+from my_robot.test_robot import TestRobot
 from data.collect_any import CollectAny
 
 from utils.time_scheduler import TimeScheduler
 from utils.robot_worker import RobotWorker
+from utils.data_handler import debug_print
 
 ARM_INFO_NAME = ["qpos", "gripper"]
 
@@ -44,9 +45,15 @@ class PathCollector:
             episode_data = episode.copy() 
             if isinstance(episode_data.get("left_arm", {}).get("qpos"), np.ndarray):
                 episode_data["left_arm"]["qpos"] = episode_data["left_arm"]["qpos"].tolist()
+            if isinstance(episode_data.get("left_arm", {}).get("gripper"), np.ndarray):
+                episode_data["left_arm"]["gripper"] = episode_data["left_arm"]["gripper"].tolist()
+
+            if isinstance(episode_data.get("right_arm", {}).get("qpos"), np.ndarray):
+                episode_data["right_arm"]["qpos"] = episode_data["right_arm"]["qpos"].tolist()
+            if isinstance(episode_data.get("right_arm", {}).get("gripper"), np.ndarray):
+                episode_data["right_arm"]["gripper"] = episode_data["right_arm"]["gripper"].tolist()
+            
             json_data[index] = episode_data
-        
-        print(json_data)
         
         save_path = os.path.join(self.condition["save_path"], f"{self.condition['task_name']}/")
         if not os.path.exists(save_path):
@@ -64,13 +71,13 @@ class PathCollector:
             with open(path, "r") as f:
                 json_data = json.load(f)
         except:
-            print(f"{path} does not exist!")
+            debug_print("path_controller", f"{path} does not exist!", "ERROR")
             return
         
         i = 0 
         for episode in json_data.values():
             
-            print(f"move {i}: {episode}")
+            debug_print("path_controller", f"move {i}: {episode}", "INFO")
             i += 1
             robot.move(episode)
             
@@ -79,10 +86,12 @@ class PathCollector:
             
             if is_block:
                 continue
-        print("play finished!")
+        debug_print("path_controller","play finished!", "INFO")
             
 if __name__ == "__main__":
-    robot = PiperSingle()
+    os.environ["INFO_LEVEL"] = "DEBUG"
+
+    robot = TestRobot(DoFs=6,INFO="DEBUG",start_episode=0)
     robot.set_up()
 
     # setting collect info

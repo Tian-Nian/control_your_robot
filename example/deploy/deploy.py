@@ -82,8 +82,8 @@ def init():
     return model, robot, episode_num, max_step
 
 if __name__ == "__main__":
-    os.environ["INFO_LEVEL"] = "INFO" # DEBUG / INFO
-
+    os.environ["INFO_LEVEL"] = "INFO" # DEBUG , INFO, ERROR
+    
     model, robot, episode_num, max_step = init()
     robot.set_up()
 

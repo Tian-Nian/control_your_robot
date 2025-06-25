@@ -3,12 +3,15 @@ This function stores all incoming data without any filtering or condition checks
 The storage format differs from the standard format used for dual-arm robots:
 each controller/sensor corresponds to a separate group.
 """
+import sys
+sys.path.append("./")
+
+from utils.data_handler import debug_print
 
 import os
 import numpy as np
 import h5py
 import json
-
 
 class CollectAny:
     def __init__(self, condition=None, start_episode=0):
@@ -30,7 +33,7 @@ class CollectAny:
         if item in self.episode[0][controller_name]:
             return np.array([self.episode[i][controller_name][item] for i in range(len(self.episode))])
         else:
-            print(f"item {item} not in {controller_name}")
+            debug_print("collect_any", f"item {item} not in {controller_name}", "ERROR")
             return None
         
     def write(self, only_end=False):
@@ -53,7 +56,7 @@ class CollectAny:
                 for item in self.episode[0][controller_name].keys():
                     data = self.get_item(controller_name, item)
                     controller_group.create_dataset(item, data=data)
-        print(f"write to {hdf5_path}")
+        debug_print("collect_any", f"write to {hdf5_path}", "INFO")
         # reset the episode
         self.episode = []
         self.episode_index += 1

@@ -75,33 +75,30 @@ class CuroboPlanner():
         self.motion_gen_batch = MotionGen(motion_gen_config)
         # self.motion_gen_batch.warmup(batch=10) # batch=CONFIGS.ROTATE_NUM = 10
         
-    
-    def ik(self, target_gripper_pose):
-        goal_pose_of_gripper = CuroboPose.from_list(list(target_gripper_pose[:3]) + list(target_gripper_pose[-4:]))
-        result = self.ik_solver.solve_single(goal_pose_of_gripper)
-        # print(result.success)
-        # print(result.js_solution.position)
+        
+    def ik(self, target_gripper_pose, current_joint_angle=None):
+        # 构造目标位姿，假设target_gripper_pose格式为[x,y,z, ..., qx,qy,qz,qw]
+        goal_pose_of_gripper = CuroboPose.from_list(
+            list(target_gripper_pose[:3]) + list(target_gripper_pose[-4:])
+        )
+        
+        if current_joint_angle is not None:
+            # current_joint_angle 应该是 shape (dof,)，添加 batch 和 seq 维度 (1,1,dof)
+            retract_config = torch.tensor(current_joint_angle, device="cuda",dtype=torch.float32).unsqueeze(0)  # (1, dof)
+            seed_config = retract_config.unsqueeze(0)  # (1, 1, dof)
+
+            result = self.ik_solver.solve_goalset(
+                goal_pose_of_gripper,
+                retract_config=retract_config,
+                seed_config=seed_config
+            )
+        else:
+            result = self.ik_solver.solve_single(goal_pose_of_gripper)
         return result
 
     # target_gripper_pose np array [:7] x y z qw qx qy qz
     def plan_path(self, curr_joint_pos, target_gripper_pose, constraint_pose=None, arms_tag=None):
-        
-        # transformation from world to arm's base
-        # world_base_pose = np.concatenate([np.array(self.robot_origion_pose.p), \
-        #                                 np.array(self.robot_origion_pose.q)])
-        # world_target_pose = np.concatenate([np.array(target_gripper_pose.p), \
-        #                                 np.array(target_gripper_pose.q)])
-        # target_pose_p, target_pose_q = \
-        #     self._trans_from_world_to_base(world_base_pose, world_target_pose)
-
-        # target_gripper_pose[0] += self.frame_bias[0]
-        # target_gripper_pose[1] += self.frame_bias[1]
-        # target_gripper_pose[2] += self.frame_bias[2]
-        
         goal_pose_of_gripper = CuroboPose.from_list(list(target_gripper_pose[:3]) + list(target_gripper_pose[-4:]))
-        # joint_indices = [self.all_joints.index(name) for name in self.active_joints_name if name in self.all_joints]
-        # joint_angles = [curr_joint_pos[index] for index in joint_indices]
-        # joint_angles = [round(angle, 5) for angle in joint_angles] # avoid the precision problem
 
         # print('[debug]: joint_angles: ', joint_angles)
         start_joint_states = JointState.from_position(
@@ -151,7 +148,7 @@ class CuroboPlanner():
         res['step'] = step
         res['result'] = vals
         return res
-
+    
     def _trans_from_world_to_base(self, base_pose, target_pose):
         # transform target pose from world frame to base frame
         # base_pose: np.array([x, y, z, qw, qx, qy, qz])
@@ -173,8 +170,11 @@ if __name__ == "__main__":
     import time
     for i in range(10):
         start  = time.time()
-        result = planner.plan_path(curr_joint_pos, target_gripper_pose)
-        # result = planner.ik(target_gripper_pose)
+        result = planner.ik(target_gripper_pose, current_joint_angle=curr_joint_pos)
+        # result2 = planner.ik(target_gripper_pose)
         end = time.time()
+        # import pdb;pdb.set_trace()
+        print(result)
+        # print(result2)
         print(f"time cost:{end - start}s")
     # print(result)

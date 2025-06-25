@@ -13,13 +13,6 @@ move_type = 0
 
 class SimRobot:
     def __init__(self, urdf_path: str, fix_root_link=True, balance_passive_force=True):
-        # 设置curobo planner
-        self.left_planner = CuroboPlanner(active_joints_name=["fl_joint1","fl_joint2","fl_joint3","fl_joint4","fl_joint5","fl_joint6"],\
-                                yml_path='/home/niantian/projects/aloha_maniskill_sim/curobo_left.yml')
-    
-        self.right_planner = CuroboPlanner(active_joints_name=["fr_joint1","fr_joint2","fr_joint3","fr_joint4","fr_joint5","fr_joint6"],\
-                                yml_path='/home/niantian/projects/aloha_maniskill_sim/curobo_right.yml')
-
         # 初始化引擎、场景、渲染器
         self.engine = sapien.Engine()
         self.renderer = sapien.SapienRenderer()
@@ -184,7 +177,7 @@ class SimRobot:
         left_target_gripper_pose = current_left_end_effort_pose + delta_move
         
         start_time = time.time()
-        left_result = self.left_planner.plan_path(current_left_joint_pose, left_target_gripper_pose)
+        left_result = self.left_planner.ik(left_target_gripper_pose)
         end_time = time.time()
         print(f"单臂:{end_time - start_time}s")
 
@@ -192,7 +185,7 @@ class SimRobot:
             left_result = current_left_joint_pose
             print("left ik fail")
             return
-        left_result = np.array(left_result.js_solution.position)[0][0]
+        left_result = np.array(left_result.js_solution.position.cpu())[0][0]
         step_n = self.compute_steps(current_left_joint_pose, left_result)
         left_path = np.linspace(current_left_joint_pose, left_result, step_n)
         self.run_trajectory(self.left_arm_indices, left_path)
@@ -213,7 +206,7 @@ class SimRobot:
             right_result = current_right_joint_pose
             print("right ik fail")
             return
-        right_result = np.array(right_result.js_solution.position)[0][0]
+        right_result = np.array(right_result.js_solution.position.cpu())[0][0]
         step_n = self.compute_steps(current_right_joint_pose, right_result)
         right_path = np.linspace(current_right_joint_pose, right_result, step_n)
         self.run_trajectory(self.right_arm_indices, right_path)

@@ -54,5 +54,5 @@ if __name__ == "__main__":
     cam_list = []
     for i in range(1000):
         print(i)
-        data = cam.get_image()
+        data = cam.get()
         time.sleep(0.1)

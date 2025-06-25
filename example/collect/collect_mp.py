@@ -13,6 +13,9 @@ from my_robot.test_robot import TestRobot
 from utils.data_handler import is_enter_pressed
 
 if __name__ == "__main__":
+    import os
+    os.environ["INFO_LEVEL"] = "DEBUG" # DEBUG , INFO, ERROR
+
     num_episode = 10
 
     for i in range(num_episode):

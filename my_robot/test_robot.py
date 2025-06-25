@@ -79,7 +79,7 @@ class TestRobot:
 
 if __name__ == "__main__":
     import os
-    os.environ["INFO_LEVEL"] = "INFO"
+    os.environ["INFO_LEVEL"] = "DEBUG" # DEBUG , INFO, ERROR
     
     robot = TestRobot()
 

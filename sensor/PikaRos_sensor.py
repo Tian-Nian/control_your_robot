@@ -5,7 +5,7 @@ import numpy as np
 
 from sensor.teleoperation_sensor import TeleoperationSensor
 from utils.ros_subscriber import ROSSubscriber 
-from utils.data_handler import compute_local_delta_pose, debug_print, compute_rotate_matrix
+from utils.data_handler import apply_local_offset_to_global_pose, compute_local_delta_pose, debug_print, compute_rotate_matrix
 
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import JointState
@@ -17,7 +17,7 @@ Pika base code(ROS) from:
 https://github.com/agilexrobotics/pika_ros.git
 '''
 
-class PikaSensor(TeleoperationSensor):
+class PikaRosSensor(TeleoperationSensor):
     def __init__(self,name):
         super().__init__()
         self.name = name
@@ -63,6 +63,7 @@ class PikaSensor(TeleoperationSensor):
         # else:
         # # 归一化
         #     gripper = (np.array([gripper_msg.position])[0] - 0.3) / 1.7
+
         qpos = compute_rotate_matrix(qpos)
         return {
             "end_pose":qpos,
@@ -86,8 +87,8 @@ class PikaSensor(TeleoperationSensor):
 if __name__ == "__main__":
     import time
     import rospy
-    pika_left = PikaSensor("left_pika")
-    pika_right = PikaSensor("right_pika")
+    pika_left = PikaRosSensor("left_pika")
+    pika_right = PikaRosSensor("right_pika")
 
     pika_left.set_up("/pika_pose_l","/gripper_l/joint_states")
     pika_right.set_up("/pika_pose_r","/gripper_r/joint_states")
@@ -96,34 +97,22 @@ if __name__ == "__main__":
     pika_right.set_collect_info(["end_pose","gripper"])
 
     rospy.init_node('ros_subscriber_node', anonymous=True)
-    left_transform_matrix =   np.array([[0, 0, -1, 0.3],
+    left_base_global_pose =   np.array([[0, 0, -1, 0.3],
                                         [-1, 0, 0, 0.3],
                                         [0, 1, 0, 0.1],
                                         [ 0, 0, 0, 1]])
     
-    right_transform_matrix =   np.array([[0, 0, -1, 0.3],
+    right_base_global_pose =   np.array([[0, 0, -1, 0.3],
                                         [1, 0, 0,-0.3],
                                         [0, -1, 0, 0.1],
                                         [0, 0, 0, 1]])
-    
-    def apply_fixed_transform(T_current, T_offset):
-        R_current = T_current[:3, :3]
-        t_current = T_current[:3, 3]
-
-        R_target = T_offset[:3, :3] @ R_current
-        t_target = T_offset[:3, 3] + t_current
-
-        T_target = np.eye(4)
-        T_target[:3, :3] = R_target
-        T_target[:3, 3] = t_target
-        return T_target
     
     while True:
         left_pose = pika_left.get_state()["end_pose"]
         right_pose = pika_right.get_state()["end_pose"]
 
-        left_wrist_mat = apply_fixed_transform(left_pose, left_transform_matrix)
-        right_wrist_mat = apply_fixed_transform(right_pose, right_transform_matrix)
+        left_wrist_mat = apply_local_offset_to_global_pose(left_pose, left_base_global_pose)
+        right_wrist_mat = apply_local_offset_to_global_pose(right_pose, right_base_global_pose)
 
         print("left_pika:\n", left_wrist_mat)
         print("right_pika:\n", right_wrist_mat)

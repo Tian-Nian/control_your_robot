@@ -3,7 +3,7 @@ from geometry_msgs.msg import Twist
 import threading
 
 class ROSPublisher:
-    def __init__(self, topic_name, msg_type):
+    def __init__(self, topic_name, msg_type, continuous=True):
         """
         Initialize ROS publisher
         :param topic_name: Name of the topic to publish
@@ -14,19 +14,24 @@ class ROSPublisher:
         self.publisher = None
         self.pub_msg = None
         self.shutdown_flag = False
+        self.continuous = continuous
 
         self.publisher = rospy.Publisher(self.topic_name, self.msg_type, queue_size=10)
 
     def publish(self, event=None):
         if self.pub_msg is None:
-            rospy.logwarn("No message to publish.")
+            # if self.continuous:
+            #     rospy.logwarn("No message to publish.")
+            return
         if self.shutdown_flag:
             return
         else:
             self.publisher.publish(self.pub_msg)
+            if not self.continuous:
+                self.pub_msg = None
 
     def continuous_publish(self):
-        rospy.Timer(rospy.Duration(0.1), self.publish)
+        rospy.Timer(rospy.Duration(0.01), self.publish)
 
     def update_msg(self, msg):
         self.pub_msg = msg

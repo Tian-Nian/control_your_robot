@@ -9,36 +9,36 @@ from data.collect_any import CollectAny
 
 # setting your realsense serial
 CAMERA_SERIALS = {
-    'head': '313522071698',  # Replace with actual serial number
-    'left_wrist': '948122073452',   # Replace with actual serial number
-    'right_wrist': '338622074268',   # Replace with actual serial number
+    'head': '1111',  # Replace with actual serial number
+    'left_wrist': '1111',   # Replace with actual serial number
+    'right_wrist': '1111',   # Replace with actual serial number
 }
 
 # Define start position (in degrees)
 START_POSITION_ANGLE_LEFT_ARM = [
-    0.0,   # Joint 1
-    0.0,    # Joint 2
-    0.0,  # Joint 3
-    0.0,   # Joint 4
-    0.0,  # Joint 5
-    0.0,    # Joint 6
+    0,   # Joint 1
+    0,    # Joint 2
+    0,  # Joint 3
+    0,   # Joint 4
+    0,  # Joint 5
+    0,    # Joint 6
 ]
 
 # Define start position (in degrees)
 START_POSITION_ANGLE_RIGHT_ARM = [
-    0.0,   # Joint 1
-    0.0,    # Joint 2
-    0.0,  # Joint 3
-    0.0,   # Joint 4
-    0.0,  # Joint 5
-    0.0,    # Joint 6
+    0,   # Joint 1
+    0,    # Joint 2
+    0,  # Joint 3
+    0,   # Joint 4
+    0,  # Joint 5
+    0,    # Joint 6
 ]
 
 condition = {
     "save_path": "./save/",
     "task_name": "test",
     "save_format": "hdf5",
-    "save_interval": 20, 
+    "save_interval": 10, 
 }
 
 class PiperDual:
@@ -56,12 +56,13 @@ class PiperDual:
         self.collection = CollectAny(condition, start_episode=start_episode)
 
     def reset(self):
-        self.arm_controllers["left_arm"].reset(np.array(START_POSITION_ANGLE_LEFT_ARM))
-        self.arm_controllers["right_arm"].reset(np.array(START_POSITION_ANGLE_RIGHT_ARM))
+        return True
+        self.arm_controllers["left_arm"].reset(START_POSITION_ANGLE_LEFT_ARM)
+        self.arm_controllers["right_arm"].reset(START_POSITION_ANGLE_RIGHT_ARM)
 
     def set_up(self):
-        self.arm_controllers["left_arm"].set_up("can_left")
-        self.arm_controllers["right_arm"].set_up("can_right")
+        self.arm_controllers["left_arm"].set_up("can0")
+        self.arm_controllers["right_arm"].set_up("can1")
         self.image_sensors["cam_head"].set_up(CAMERA_SERIALS['head'], is_depth=False)
         self.image_sensors["cam_left_wrist"].set_up(CAMERA_SERIALS['left_wrist'], is_depth=False)
         self.image_sensors["cam_right_wrist"].set_up(CAMERA_SERIALS['right_wrist'], is_depth=False)
@@ -105,45 +106,36 @@ class PiperDual:
     def move(self, move_data):
         self.arm_controllers["left_arm"].move(move_data["left_arm"],is_delta=False)
         self.arm_controllers["right_arm"].move(move_data["right_arm"],is_delta=False)
-    
 
-if __name__=="__main__":
+def teleop():
+    pass
+
+if __name__ == "__main__":
     import time
+    
     robot = PiperDual()
     robot.set_up()
-    #采集测试
+
+    # collection test
     data_list = []
-    # for i in range(100):
-    #     print(i)
-    #     data = robot.get()
-    #     robot.collect(data)
-    #     time.sleep(0.1)
-    # robot.finish()
+    for i in range(100):
+        print(i)
+        data = robot.get()
+        robot.collect(data)
+        time.sleep(0.1)
+    robot.finish()
     
-    # 运动测试
-  
+    # moving test
     move_data = {
         "left_arm":{
-        "qpos":[0.057, 0.0, 0.216, 0.0, 0.085, 0.0],
-        "gripper":0.8,
-        },
-        "right_arm":{
-        "qpos":[0.057, 0.0, 0.216, 0.0, 0.085, 0.0],
-        "gripper":0.8,
+        "qpos":[0.057, 0.0, 0.216, 0.0, 0.085, 0.0, 0.057, 0.0, 0.216, 0.0, 0.085, 0.0],
+        "gripper":0.2,
         },
     }
-    robot.move(move_data)
-    time.sleep(2)
+    
     move_data = {
         "left_arm":{
-        "qpos":[0.060, 0.0, 0.260, 0.0, 0.085, 0.0],
-        "gripper":0.0,
-        },
-        "right_arm":{
-        "qpos":[0.060, 0.0, 0.260, 0.0, 0.085, 0.0],
-        "gripper":0.0,
+        "qpos":[0.060, 0.0, 0.260, 0.0, 0.085, 0.0, 0.060, 0.0, 0.260, 0.0, 0.085, 0.0],
+        "gripper":0.2,
         },
     }
-    robot.move(move_data)
-    robot.reset()
-    

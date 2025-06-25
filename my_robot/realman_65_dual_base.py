@@ -55,7 +55,7 @@ class MyRobot:
             "cam_right_wrist": RealsenseSensor("cam_right_wrist"),
         }
         self.condition = condition
-        self.collection = CollectAny(condition, start_episode=0)
+        self.collection = CollectAny(condition, start_episode=start_episode)
 
     def set_up(self):
         self.arm_controllers["left_arm"].set_up("192.168.80.18", rm_thread_mode_e.RM_TRIPLE_MODE_E)

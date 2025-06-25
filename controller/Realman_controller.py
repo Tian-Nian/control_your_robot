@@ -200,3 +200,11 @@ def initialize_robot(robot_ip, thread_mode=None, connection_level=3):
     
     print(f"Failed to connect to robot at {robot_ip} after {max_retries} attempts")
     return None
+
+if __name__ == "__main__":
+    controller = RealmanController("Realman")
+    controller.set_up("192.168.1.18", rm_thread_mode_e.RM_TRIPLE_MODE_E)
+    controller.reset([0, 0, 0, 0, 0, 0, 0])
+    time.sleep(1)
+    controller.set_gripper(0.5)
+    time.sleep(1)

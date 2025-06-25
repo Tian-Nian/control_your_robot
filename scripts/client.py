@@ -67,7 +67,7 @@ class Client:
 
 if __name__ == "__main__":
     import os
-    os.environ["INFO_LEVEL"] = "INFO"
+    os.environ["INFO_LEVEL"] = "DEBUG"
     
     ip = "127.0.0.1"
     port = 10000

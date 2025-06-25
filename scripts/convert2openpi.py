@@ -75,7 +75,7 @@ def load_raw_episode_data(
     ep_path: Path,
 ) -> tuple[dict[str, np.ndarray], torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
     with h5py.File(ep_path, "r") as ep:
-        print(ep_path)
+        # print(ep_path)
         state = torch.from_numpy(ep["/observations/qpos"][:])
         action = torch.from_numpy(ep["/action"][:])
 

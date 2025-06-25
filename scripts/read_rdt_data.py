@@ -1,3 +1,7 @@
+import sys
+sys.path.append("./")
+from utils.data_handler import debug_print
+
 import h5py
 import numpy as np
 import cv2
@@ -19,7 +23,6 @@ def print_hdf5_group_info(group, indent=0):
         elif isinstance(item, h5py.Dataset):
             print(f"{indent_str}Dataset: {key}")
             print(f"{indent_str}  Shape: {item.shape}, dtype: {item.dtype}")
-            # print(f"{indent_str}  Shape: {item.shape}")
 
 def save_video_from_bytes(img_bytes, video_path, fps=30, frame_size=(640, 480)):
     """
@@ -42,9 +45,9 @@ def save_video_from_bytes(img_bytes, video_path, fps=30, frame_size=(640, 480)):
                 img_resized = cv2.resize(img, frame_size)
                 video_writer.write(img_resized)
             else:
-                print("Image decoding failed.")
+                debug_print("read_rdt_data","Image decoding failed.", "ERROR")
     except Exception as e:
-        print(f"Error decoding image: {e}")
+        debug_print("read_rdt_data", f"Error decoding image: {e}", "ERROR")
     finally:
         # release VideoWriter
         if 'video_writer' in locals():
@@ -59,9 +62,9 @@ def display_image_from_bytes(img_bytes):
             cv2.imshow("Decoded Image", img)
             cv2.waitKey(10)
         else:
-            print("Image decoding failed.")
+            debug_print("read_rdt_data","Image decoding failed.", "ERROR")
     except Exception as e:
-        print(f"Error decoding image: {e}")
+        debug_print("read_rdt_data", f"Error decoding image: {e}", "ERROR")
 
 
 def print_hdf5_file_info_and_display_images(file_path):

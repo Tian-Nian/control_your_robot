@@ -9,7 +9,7 @@ import numpy as np
 
 from policy.RDT.inference_model import RDT
 
-from utils.data_handler import is_enter_pressed
+from utils.data_handler import is_enter_pressed, debug_print
 
 
 def input_transform(data):
@@ -69,6 +69,10 @@ if __name__ == "__main__":
             model.update_observation_window(img_arr, state)
             action_chunk = model.get_action()
             for action in action_chunk:
+                if is_enter_pressed():
+                    debug_print("main", "Moving interrupted!", "WARNING")
+                    is_start = False
+                    break
                 move_data = output_transform(action)
                 robot.move(move_data)
                 step += 1

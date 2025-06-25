@@ -13,12 +13,14 @@ class TeleoperationSensor(Sensor):
         self.sensor = None
     
     def get_information(self):
-        arm_info = {}
+        sensor_info = {}
         state = self.get_state()
         if "end_pose" in self.collect_info:
-            arm_info["end_pose"] = state["end_pose"]
+            sensor_info["end_pose"] = state["end_pose"]
         if "velocity" in self.collect_info:
-            arm_info["velocity"] = state["velocity"]
+            sensor_info["velocity"] = state["velocity"]
         if "gripper" in self.collect_info:
-            arm_info["gripper"] = state["gripper"]
-        return arm_info
+            sensor_info["gripper"] = state["gripper"]
+        if "extra" in self.collect_info:
+            sensor_info["extra"] = state["extra"]
+        return sensor_info
