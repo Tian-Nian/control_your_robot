@@ -66,7 +66,7 @@ if __name__ == "__main__":
     robot = PiperDual()
     robot.set_up()
     # load model
-    model = PI0_DUAL("output/openpi/80000", "stack_plates")
+    model = PI0_DUAL("your_model_path", "task_instruction")
     max_step = 1000
     num_episode = 10
     

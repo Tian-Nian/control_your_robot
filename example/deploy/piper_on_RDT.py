@@ -208,7 +208,7 @@ if __name__ == "__main__":
     robot = PiperDual()
     robot.set_up()
     # load model
-    model = RDT("output/RDT/lantian/6.6_1w/mp_rank_00_model_states_lantian_1w.pt", "stack_plates")
+    model = RDT("your_model_path", "task_instruction")
     max_step = 1000
     num_episode = 10
 
@@ -252,5 +252,5 @@ if __name__ == "__main__":
         robot.reset()
         print("finish episode", i)
     robot.reset()
-    
+
     
