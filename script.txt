@@ -1,7 +1,0 @@
-#single piper can enable
-cd piper_scripts/
-bash can_activate.sh can0 1000000&&cd ..
-
-#dual piper can enable
-cd piper_scripts/
-bash can_config.sh&&cd ..
