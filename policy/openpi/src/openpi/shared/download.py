@@ -62,7 +62,7 @@ def maybe_download(url: str, *, force_download: bool = False, **kwargs) -> pathl
         if not path.exists():
             raise FileNotFoundError(f"File not found at {url}")
         return path.resolve()
-    print("get_cache_dir")
+
     cache_dir = get_cache_dir()
 
     local_path = cache_dir / parsed.netloc / parsed.path.strip("/")
@@ -75,7 +75,7 @@ def maybe_download(url: str, *, force_download: bool = False, **kwargs) -> pathl
             invalidate_cache = True
         else:
             return local_path
-    
+
     try:
         lock_path = local_path.with_suffix(".lock")
         with filelock.FileLock(lock_path):
@@ -104,7 +104,6 @@ def maybe_download(url: str, *, force_download: bool = False, **kwargs) -> pathl
                     botocore_config=botocore.config.Config(signature_version=botocore.UNSIGNED),
                 )
             elif url.startswith("s3://"):
-                print("Downloading from S3 bucket")
                 # Download with default boto3 credentials.
                 _download_boto3(url, scratch_path)
             else:

@@ -39,7 +39,7 @@ if __name__ == "__main__":
     robot = TestRobot(DoFs=6)
     robot.set_up()
     # load model
-    model = PI0_DUAL("ttit", "task_name")
+    model = PI0_DUAL("model_path", "task_name")
     max_step = 1000
     num_episode = 10
 
