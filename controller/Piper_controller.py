@@ -29,8 +29,8 @@ class PiperController(ArmController):
     def reset(self, start_state):
         try:
             self.set_joint(start_state)
-        except e:
-            print(f"reset error: {e}")
+        except :
+            print(f"reset error")
         return
 
     # 返回单位为米
@@ -57,7 +57,7 @@ class PiperController(ArmController):
     def set_joint(self, joint):
         j1, j2, j3 ,j4, j5, j6 = joint * 57295.7795 #1000*180/3.1415926
         j1, j2, j3 ,j4, j5, j6 = int(j1), int(j2), int(j3), int(j4), int(j5), int(j6)
-        self.controller.MotionCtrl_2(0x01, 0x01, 100, 0x00)
+        self.controller.MotionCtrl_2(0x01, 0x01, 100, 0xAD)
         self.controller.JointCtrl(j1, j2, j3, j4, j5, j6)
 
     # The input gripper value is in the range [0, 1], representing the degree of opening.

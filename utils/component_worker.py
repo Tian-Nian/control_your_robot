@@ -4,11 +4,17 @@ from controller import *
 import time
 from typing import *
 
+from sensor import *
+from controller import *
+
 from multiprocessing import Event, Semaphore, Process, Value, Manager
 
 from utils.data_handler import debug_print, DataBuffer
+import rospy
 
-def ComponentWorker(component_class, component_name, component_setup_input, component_collect_info, data_buffer: DataBuffer,
+import importlib
+
+def ComponentWorker(component_class_name, component_name, component_setup_input, component_collect_info, data_buffer: DataBuffer,
                 time_lock: Event, start_event: Event, finish_event: Event, process_name: str):
     '''
     组件级别的多进程同步器, 用于多进程数据采集, 如果希望是多进程的同步控制也可以稍微改下代码添加一个共享的信号输入
@@ -23,7 +29,10 @@ def ComponentWorker(component_class, component_name, component_setup_input, comp
     finish_event: 同步结束事件, 所有的组件共用一个, multiprocessing::Event
     process_name:你希望当前进程叫什么, 用于对应子进程info的输出, str
     '''
-    component = component_class(component_name)
+    rospy.init_node(f'{component_class_name}', anonymous=True)
+    moudle = importlib.import_module(component_class_name)
+    Cls = getattr(moudle, component_class_name)
+    component = Cls(component_name)
     
     if not component_setup_input is None:
         component.set_up(*component_setup_input)

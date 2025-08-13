@@ -14,6 +14,7 @@ import os
 import numpy as np
 import h5py
 import json
+import time
 
 class CollectAny:
     def __init__(self, condition=None, start_episode=0, move_check=True):
@@ -22,6 +23,9 @@ class CollectAny:
         self.episode_index = start_episode
         self.move_check = move_check
         self.last_controller_data = None
+
+        self.iter = 0
+        self.iter_time = time.monotonic()
     
     def collect(self, controllers_data, sensors_data):
         episode_data = {}
@@ -37,10 +41,15 @@ class CollectAny:
                 self.last_controller_data = controllers_data
                 self.episode.append(episode_data)
             else:
-                if self.move_check_success(controllers_data, tolerance=0.01):
+                if self.move_check_success(controllers_data, tolerance=0.0001):
                     self.episode.append(episode_data)
                 else:
-                    debug_print("collect_any", f"robot is not moving, skip this frame!", "INFO")
+                    now = time.monotonic()
+                    # if now - self.iter_time > 0.5:
+                    #     self.iter_time = now
+                    debug_print("collect_any", f"robot is not moving, skip this frame! {self.iter}", "INFO")
+                    self.iter += 1
+                    
                 self.last_controller_data = controllers_data
     
     def get_item(self, controller_name, item):
@@ -97,6 +106,7 @@ class CollectAny:
         # reset the episode
         self.episode = []
         self.episode_index += 1
+        self.iter = 0
 
     def move_check_success(self, controller_data: dict, tolerance: float) -> bool:
         """

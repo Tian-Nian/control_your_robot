@@ -15,6 +15,7 @@ from data.collect_any import CollectAny
 
 from utils.data_handler import debug_print, hdf5_groups_to_dict
 
+import cv2
 
 condition = {
     "save_path": "./save/", 
@@ -79,17 +80,31 @@ class Robot:
                     self.controllers[controller_type_name][controller_name].move(controller_action,is_delta=False)
     
     def is_start(self):
-        debug_print(self.name, "your are using default func: is_start(), this will return True only", "DEBUG")
+        # debug_print(self.name, "your are using default func: is_start(), this will return True only", "DEBUG")
         return True
 
     def reset(self):
-        debug_print(self.name, "your are using default func: reset(), this will return True only", "DEBUG")
+        # debug_print(self.name, "your are using default func: reset(), this will return True only", "DEBUG")
         return True
+
+    def show_pic(self, data_path, pic_name):
+        parent_dir = os.path.dirname(data_path)
+        config_path = os.path.join(parent_dir, "config.json")
+        
+        with open(config_path, 'r', encoding='utf-8') as f:
+            condition = json.load(f)
+        
+        time_interval = 1.0 / condition['save_freq']
+
+        episode = dict_to_list(hdf5_groups_to_dict(data_path))
+        for ep in episode:
+            cv2.imshow("pic", ep[pic_name]["color"])
+            cv2.waitKey(10)
 
     def replay(self, data_path, key_banned=None, is_collect=False, episode_id=None):
         parent_dir = os.path.dirname(data_path)
         config_path = os.path.join(parent_dir, "config.json")
-
+        
         with open(config_path, 'r', encoding='utf-8') as f:
             condition = json.load(f)
         
@@ -144,5 +159,6 @@ def dict_to_list(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     length = get_array_length(data)
     return [split_nested_dict(data, i) for i in range(length)]
 
-def remove_duplicate_keys(source_dict: dict[str, any], keys_to_remove: list[str]) -> dict[str, any]:
+# def remove_duplicate_keys(source_dict: dict[str, any], keys_to_remove: list[str]) -> dict[str, any]:
+def remove_duplicate_keys(source_dict, keys_to_remove):
     return {k: v for k, v in source_dict.items() if k not in keys_to_remove}

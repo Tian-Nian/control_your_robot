@@ -6,8 +6,13 @@ from multiprocessing import Process, Manager, Event, Semaphore
 
 from data.collect_any import CollectAny
 
-from sensor.TestVision_sensor import TestVisonSensor
-from controller.TestArm_controller import TestArmController
+# from sensor.TestVision_sensor import TestVisonSensor
+# from controller.TestArm_controller import TestArmController
+
+from sensor.VisionROS_sensor import VisionROSensor
+from sensor.Realsense_sensor import RealsenseSensor
+
+from controller.Piper_controller import PiperController
 
 from utils.time_scheduler import TimeScheduler
 from utils.component_worker import ComponentWorker
@@ -15,9 +20,11 @@ from utils.data_handler import is_enter_pressed, DataBuffer
 
 from typing import Dict, List
 
+import multiprocessing as mp
+
 condition = {
     "save_path": "./save/",
-    "task_name": "test",
+    "task_name": "test1",
     "save_format": "hdf5",
     "save_freq": 10, 
 }
@@ -43,6 +50,12 @@ def dict2list(data: Dict[str, List]) -> List[Dict]:
     return result
 
 if __name__ == "__main__":
+    import rospy
+
+    mp.set_start_method("spawn")
+
+    rospy.init_node('ros_subscriber_node', anonymous=True)
+
     import os
     os.environ["INFO_LEVEL"] = "DEBUG"
     num_episode = 3
@@ -55,7 +68,7 @@ if __name__ == "__main__":
         is_start = False
 
         # 初始化共享操作
-        processes = []
+        processes = {}
         start_event = Event()
         finish_event = Event()
         manager = Manager()
@@ -63,14 +76,18 @@ if __name__ == "__main__":
 
         time_lock_vision = Event()
         time_lock_arm = Event()
-        vision_process = Process(target=ComponentWorker, args=(TestVisonSensor, "test_vision", None, ["color"], data_buffer, time_lock_vision, start_event, finish_event, "vision_worker"))
-        arm_process = Process(target=ComponentWorker, args=(TestArmController, "test_arm", None, ["joint", "qpos", "gripper"], data_buffer, time_lock_arm, start_event, finish_event, "arm_worker"))
-        time_scheduler = TimeScheduler([time_lock_vision, time_lock_arm], time_freq=100) # 可以给多个进程同时上锁
-        
-        processes.append(vision_process)
-        processes.append(arm_process)
+        processes["vision_process_h"] = Process(target=ComponentWorker, args=(RealsenseSensor, "cam_head", ["342622301553"], ["color"], data_buffer, time_lock_vision, start_event, finish_event, "vision_worker_head"))
+        processes["vision_process_l"] = Process(target=ComponentWorker, args=(VisionROSensor, "cam_left", ["/camera_l/color/image_raw"], ["color"], data_buffer, time_lock_vision, start_event, finish_event, "vision_worker_l"))
+        processes["vision_process_r"] = Process(target=ComponentWorker, args=(VisionROSensor, "cam_right", ["/camera_r/color/image_raw"], ["color"], data_buffer, time_lock_vision, start_event, finish_event, "vision_worker_r"))
 
-        for process in processes:
+        processes["arm_process_l"] = Process(target=ComponentWorker, args=(PiperController, "arm_left", ["can_left"], ["joint", "qpos", "gripper"], data_buffer, time_lock_arm, start_event, finish_event, "arm_worker_l"))
+        processes["arm_process_r"] = Process(target=ComponentWorker, args=(PiperController, "arm_right", ["can_left"], ["joint", "qpos", "gripper"], data_buffer, time_lock_arm, start_event, finish_event, "arm_worker_r"))
+        time_scheduler = TimeScheduler([time_lock_vision, time_lock_arm], time_freq=30) # 可以给多个进程同时上锁
+        
+        # processes.append(vision_process)
+        # processes.append(arm_process)
+
+        for process in processes.values():
             process.start()
 
         while not is_start:
@@ -86,17 +103,23 @@ if __name__ == "__main__":
             time.sleep(0.01)
             if is_enter_pressed():
                 finish_event.set()  
-                time_scheduler.stop()  
                 is_start = False
+                break
         
+        print("11111next step!")
+        
+
         # 销毁多进程
-        for process in processes:
+        for process in processes.values():
             if process.is_alive():
                 process.join()
                 process.close()
         
         data = data_buffer.get()
+        # import pdb;pdb.set_trace()
         data = dict2list(data)
+        
+        time_scheduler.stop()  
         
         avg_collect_time += time_scheduler.real_time_average_time_interval
         for i in range(len(data)):
@@ -107,3 +130,5 @@ if __name__ == "__main__":
     extra_info = {}
     extra_info["avg_time_interval"] = avg_collect_time
     collection.add_extra_condition_info(extra_info)
+
+    print("next step!")

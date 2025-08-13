@@ -3,7 +3,7 @@ import threading
 from typing import Callable, Optional
 
 class ROSSubscriber:
-    def __init__(self, topic_name, msg_type,call: Optional[Callable] = None):
+    def __init__(self, topic_name, msg_type, call: Optional[Callable] = None):
         """
         Initialize ROS subscriber
         :param topic_name: Name of the topic to subscribe to

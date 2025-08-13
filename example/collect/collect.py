@@ -3,7 +3,7 @@ sys.path.append("./")
 
 import select
 
-from my_robot.test_robot import TestRobot
+from my_robot.agilex_piper_dual_base import PiperDual
 
 import time
 
@@ -14,7 +14,10 @@ if __name__ == "__main__":
     import os
     os.environ["INFO_LEVEL"] = "DEBUG" # DEBUG , INFO, ERROR
 
-    robot = TestRobot()
+    import rospy
+    rospy.init_node('ros_subscriber_node', anonymous=True)
+
+    robot = PiperDual()
     robot.set_up()
     num_episode = 10
     robot.condition["task_name"] = "my_test"
@@ -23,7 +26,7 @@ if __name__ == "__main__":
         robot.reset()
         debug_print("main", "Press Enter to start...", "INFO")
         while not robot.is_start() or not is_enter_pressed():
-            time.sleep(1/robot.condition["save_interval"])
+            time.sleep(1/robot.condition["save_freq"])
         
         debug_print("main", "Press Enter to finish...", "INFO")
 
@@ -34,5 +37,5 @@ if __name__ == "__main__":
             if is_enter_pressed():
                 robot.finish()
                 break
-                
-            time.sleep(1/robot.condition["save_interval"])
+            
+            time.sleep(1/robot.condition["save_freq"])

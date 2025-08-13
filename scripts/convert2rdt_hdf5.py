@@ -6,7 +6,7 @@ import numpy as np
 import os
 from tqdm import tqdm
 
-from utils.data_handler import hdf5_groups_to_dict
+from utils.data_handler import hdf5_groups_to_dict, get_files, get_item
 
 import cv2
 
@@ -33,9 +33,10 @@ map = {
 
 map = {
     "cam_high": "cam_head.color",
-    "cam_wrist": "cam_wrist.color",
-    "qpos": ["left_arm.joint","left_arm.gripper"],
-    "action": ["left_arm.joint","left_arm.gripper"],
+    "cam_left_wrist": "cam_left_wrist.color",
+    "cam_right_wrist": "cam_right_wrist.color",
+    "qpos": ["left_arm.joint","left_arm.gripper","right_arm.joint","right_arm.gripper"],
+    "action": ["left_arm.joint","left_arm.gripper","right_arm.joint","right_arm.gripper"],
 }
 
 def images_encoding(imgs):
@@ -62,7 +63,7 @@ def convert(hdf5_paths, output_path, start_index=0):
         
         hdf5_output_path = os.path.join(output_path, f"episode_{index}.hdf5")
         index += 1
-
+        print(data.keys())
         with h5py.File(hdf5_output_path, "w") as f:
             obs = f.create_group("observations")
             '''
@@ -80,20 +81,20 @@ def convert(hdf5_paths, output_path, start_index=0):
             
             # Retrieve data based on your camera/view names, then encode and compress it for storage.
 
-            # cam_high = get_item(data, map["cam_high"])
-            cam_wrist = get_item(data, map["cam_wrist"])
-            # cam_left_wrist = get_item(data, map["cam_left_wrist"])
-            # cam_right_wrist = get_item(data, map["cam_right_wrist"])
+            cam_high = get_item(data, map["cam_high"])
+            # cam_wrist = get_item(data, map["cam_wrist"])
+            cam_left_wrist = get_item(data, map["cam_left_wrist"])
+            cam_right_wrist = get_item(data, map["cam_right_wrist"])
             
-            # head_enc, head_len = images_encoding(cam_high)
-            wrist_enc, wrist_len = images_encoding(cam_wrist)
-            # left_enc, left_len = images_encoding(cam_left_wrist)
-            # right_enc, right_len = images_encoding(cam_right_wrist)
+            head_enc, head_len = images_encoding(cam_high)
+            # wrist_enc, wrist_len = images_encoding(cam_wrist)
+            left_enc, left_len = images_encoding(cam_left_wrist)
+            right_enc, right_len = images_encoding(cam_right_wrist)
 
-            # images.create_dataset('cam_high', data=head_enc, dtype=f'S{head_len}')
-            images.create_dataset('cam_wrist', data=wrist_enc, dtype=f'S{wrist_len}')
-            # images.create_dataset('cam_left_wrist', data=left_enc, dtype=f'S{left_len}')
-            # images.create_dataset('cam_right_wrist', data=right_enc, dtype=f'S{right_len}')
+            images.create_dataset('cam_high', data=head_enc, dtype=f'S{head_len}')
+            # images.create_dataset('cam_wrist', data=wrist_enc, dtype=f'S{wrist_len}')
+            images.create_dataset('cam_left_wrist', data=left_enc, dtype=f'S{left_len}')
+            images.create_dataset('cam_right_wrist', data=right_enc, dtype=f'S{right_len}')
         
         print(f"convert {hdf5_path} to rdt data format")
 

@@ -12,6 +12,8 @@ __pycache__/
 datasets/
 save/
 
+hdf5/
+
 # example/teleop
 
 # third_party

@@ -20,6 +20,7 @@ import tyro
 import json
 import os
 import fnmatch
+from typing import *
 
 @dataclasses.dataclass(frozen=True)
 class DatasetConfig:

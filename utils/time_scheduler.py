@@ -79,11 +79,11 @@ class TimeScheduler:
         '''
         释放该时间同步器进程
         '''
-        for event in self.time_events:
-                event.set()  # 防止卡在获取锁
-        self.time_locker.terminate()
-        self.time_locker.join()
-        self.time_locker.close()
+        # for event in self.time_events:
+        #         event.set()  # 防止卡在获取锁
+        # self.time_locker.terminate()
+        # self.time_locker.join()
+        # self.time_locker.close()
         self.time_locker = None
         with self.real_time_accumulate_time_interval.get_lock():
             self.real_time_average_time_interval = self.real_time_accumulate_time_interval.value / self.step.value
