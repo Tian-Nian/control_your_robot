@@ -25,13 +25,16 @@ condition = {
 }
 
 class Robot:
-    def __init__(self, start_episode=0) -> None:
+    def __init__(self, 
+            move_check=False,
+            start_episode=0) -> None:
+
         self.name = "base_robot"
         self.controllers = {}
         self.sensors = {}
 
         self.condition = condition
-        self.collection = CollectAny(condition, start_episode=start_episode)
+        self.collection = CollectAny(condition, move_check=move_check, start_episode=start_episode)
 
     def set_up(self):
         debug_print(self.name, "set_up() should be realized by your robot class", "ERROR")
@@ -98,6 +101,7 @@ class Robot:
 
         episode = dict_to_list(hdf5_groups_to_dict(data_path))
         for ep in episode:
+            import pdb
             cv2.imshow("pic", ep[pic_name]["color"])
             cv2.waitKey(10)
 
@@ -119,11 +123,14 @@ class Robot:
                 data = self.get()
                 self.collect(data)
             self.play_once(ep, key_banned)
+            print(now_time - last_time , "s")
+
             last_time = time.monotonic()
         if is_collect:
             self.finish(episode_id)
     
     def play_once(self, episode: Dict[str, Any], key_banned=None):
+        # print(episode["left_arm"]["joint"])
         for controller_type, controller_group in self.controllers.items():
             for controller_name, controller in controller_group.items():
                 if controller_name in episode:
@@ -132,6 +139,8 @@ class Robot:
                             controller_name: episode[controller_name],
                         },
                     }
+                    # import pdb
+                    # pdb.set_trace()
                     self.move(move_data, key_banned=key_banned)
 
 def get_array_length(data: Dict[str, Any]) -> int:

@@ -26,7 +26,7 @@ condition = {
     "save_path": "./save/",
     "task_name": "test1",
     "save_format": "hdf5",
-    "save_freq": 10, 
+    "save_freq": 30, 
 }
 
 
@@ -50,11 +50,11 @@ def dict2list(data: Dict[str, List]) -> List[Dict]:
     return result
 
 if __name__ == "__main__":
-    import rospy
+    # import rospy
 
-    mp.set_start_method("spawn")
+    # mp.set_start_method("spawn")
 
-    rospy.init_node('ros_subscriber_node', anonymous=True)
+    # rospy.init_node('ros_subscriber_node', anonymous=True)
 
     import os
     os.environ["INFO_LEVEL"] = "DEBUG"
@@ -77,12 +77,12 @@ if __name__ == "__main__":
         time_lock_vision = Event()
         time_lock_arm = Event()
         processes["vision_process_h"] = Process(target=ComponentWorker, args=(RealsenseSensor, "cam_head", ["342622301553"], ["color"], data_buffer, time_lock_vision, start_event, finish_event, "vision_worker_head"))
-        processes["vision_process_l"] = Process(target=ComponentWorker, args=(VisionROSensor, "cam_left", ["/camera_l/color/image_raw"], ["color"], data_buffer, time_lock_vision, start_event, finish_event, "vision_worker_l"))
-        processes["vision_process_r"] = Process(target=ComponentWorker, args=(VisionROSensor, "cam_right", ["/camera_r/color/image_raw"], ["color"], data_buffer, time_lock_vision, start_event, finish_event, "vision_worker_r"))
+        processes["vision_process_l"] = Process(target=ComponentWorker, args=(RealsenseSensor, "cam_left_wrist", ["242522071124"], ["color"], data_buffer, time_lock_vision, start_event, finish_event, "vision_worker_l"))
+        processes["vision_process_r"] = Process(target=ComponentWorker, args=(RealsenseSensor, "cam_right_wrist", ["244622071566"], ["color"], data_buffer, time_lock_vision, start_event, finish_event, "vision_worker_r"))
 
-        processes["arm_process_l"] = Process(target=ComponentWorker, args=(PiperController, "arm_left", ["can_left"], ["joint", "qpos", "gripper"], data_buffer, time_lock_arm, start_event, finish_event, "arm_worker_l"))
-        processes["arm_process_r"] = Process(target=ComponentWorker, args=(PiperController, "arm_right", ["can_left"], ["joint", "qpos", "gripper"], data_buffer, time_lock_arm, start_event, finish_event, "arm_worker_r"))
-        time_scheduler = TimeScheduler([time_lock_vision, time_lock_arm], time_freq=30) # 可以给多个进程同时上锁
+        processes["arm_process_l"] = Process(target=ComponentWorker, args=(PiperController, "left_arm", ["can_left"], ["joint", "qpos", "gripper"], data_buffer, time_lock_arm, start_event, finish_event, "arm_worker_l"))
+        processes["arm_process_r"] = Process(target=ComponentWorker, args=(PiperController, "right_arm", ["can_right"], ["joint", "qpos", "gripper"], data_buffer, time_lock_arm, start_event, finish_event, "arm_worker_r"))
+        time_scheduler = TimeScheduler([time_lock_vision, time_lock_arm], time_freq=condition["save_freq"]) # 可以给多个进程同时上锁
         
         # processes.append(vision_process)
         # processes.append(arm_process)

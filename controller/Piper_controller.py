@@ -18,6 +18,7 @@ class PiperController(ArmController):
         self.name = name
         self.controller_type = "user_controller"
         self.controller = None
+        self.last_action = None
     
     def set_up(self, can:str):
         piper = C_PiperInterface_V2(can)
@@ -53,12 +54,33 @@ class PiperController(ArmController):
 
         self.controller.MotionCtrl_2(0x01, 0x00, 100, 0x00)
         self.controller.EndPoseCtrl(x, y, z, rx, ry, rz)
-    
+
     def set_joint(self, joint):
         j1, j2, j3 ,j4, j5, j6 = joint * 57295.7795 #1000*180/3.1415926
         j1, j2, j3 ,j4, j5, j6 = int(j1), int(j2), int(j3), int(j4), int(j5), int(j6)
-        self.controller.MotionCtrl_2(0x01, 0x01, 100, 0xAD)
+
+        self.controller.MotionCtrl_2(0x01, 0x01, 100, 0x00)
         self.controller.JointCtrl(j1, j2, j3, j4, j5, j6)
+    
+    # def set_joint(self, joint):
+    #     j1, j2, j3 ,j4, j5, j6 = joint * 57295.7795 #1000*180/3.1415926
+    #     j1, j2, j3 ,j4, j5, j6 = int(j1), int(j2), int(j3), int(j4), int(j5), int(j6)
+
+    #     action = np.array([j1, j2, j3 ,j4, j5, j6])
+    #     last_time = time.monotonic()
+    #     if self.last_action is not None:
+    #         move_actions = np.linspace(self.last_action, action, 20)
+    #         for move_action in move_actions:
+    #             self.controller.MotionCtrl_2(0x01, 0x01, 100, 0xAD)
+                
+    #             j1, j2, j3 ,j4, j5, j6 = move_action
+    #             j1, j2, j3 ,j4, j5, j6 = int(j1), int(j2), int(j3), int(j4), int(j5), int(j6)
+    #             self.controller.JointCtrl(j1, j2, j3, j4, j5, j6)
+    #             while True:
+    #                 now = time.monotonic()
+    #                 if now - last_time >= 1 / 100:
+    #                     break
+    #     self.last_action = np.array([j1, j2, j3 ,j4, j5, j6])
 
     # The input gripper value is in the range [0, 1], representing the degree of opening.
     def set_gripper(self, gripper):
@@ -105,8 +127,11 @@ def enable_fun(piper:C_PiperInterface_V2):
 
 if __name__=="__main__":
     controller = PiperController("test_piper")
-    controller.set_up("can0")
-    print(controller.get_state())
+    controller.set_up("can_left")
+    while True:
+        print(controller.get_state()["joint"])  
+        time.sleep(0.01)
+     
     print(controller.get_gripper())
 
     controller.set_gripper(0.2)
@@ -116,7 +141,7 @@ if __name__=="__main__":
     print(controller.get_gripper())
     print(controller.get_state())
 
-    controller.set_position(np.array([0.057, 0.0, 0.260, 0.0, 0.085, 0.0]))
-    time.sleep(1)
-    print(controller.get_gripper())
-    print(controller.get_state())
+    # controller.set_position(np.array([0.057, 0.0, 0.260, 0.0, 0.085, 0.0]))
+    # time.sleep(1)
+    # print(controller.get_gripper())
+    # print(controller.get_state())

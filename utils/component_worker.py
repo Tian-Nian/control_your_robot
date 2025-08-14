@@ -29,10 +29,10 @@ def ComponentWorker(component_class_name, component_name, component_setup_input,
     finish_event: 同步结束事件, 所有的组件共用一个, multiprocessing::Event
     process_name:你希望当前进程叫什么, 用于对应子进程info的输出, str
     '''
-    rospy.init_node(f'{component_class_name}', anonymous=True)
-    moudle = importlib.import_module(component_class_name)
-    Cls = getattr(moudle, component_class_name)
-    component = Cls(component_name)
+    # rospy.init_node(f'{component_class_name}', anonymous=True)
+    # moudle = importlib.import_module(component_class_name)
+    # Cls = getattr(moudle, component_class_name)
+    component = component_class_name(component_name)
     
     if not component_setup_input is None:
         component.set_up(*component_setup_input)

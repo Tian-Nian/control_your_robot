@@ -65,6 +65,10 @@ def convert(hdf5_paths, output_path, start_index=0):
         index += 1
         print(data.keys())
         with h5py.File(hdf5_output_path, "w") as f:
+            action = np.array(get_item(data, map["action"])).astype(np.float32)
+
+            f.create_dataset('action', data=np.array(action), dtype="float32")
+
             obs = f.create_group("observations")
             '''
             Basic robot arm parameters: if you’re using joint values, 
@@ -72,10 +76,10 @@ def convert(hdf5_paths, output_path, start_index=0):
             but remember to update the corresponding model’s data loading phase accordingly.
             '''
             qpos = np.array(get_item(data, map["qpos"])).astype(np.float32)
-            action = np.array(get_item(data, map["action"])).astype(np.float32)
 
             obs.create_dataset('qpos', data=np.array(qpos), dtype="float32")
-            f.create_dataset('action', data=np.array(action), dtype="float32")
+            obs.create_dataset("left_arm_dim", data=np.array(6))
+            obs.create_dataset("right_arm_dim", data=np.array(6))
 
             images = obs.create_group("images")
             
@@ -86,15 +90,19 @@ def convert(hdf5_paths, output_path, start_index=0):
             cam_left_wrist = get_item(data, map["cam_left_wrist"])
             cam_right_wrist = get_item(data, map["cam_right_wrist"])
             
-            head_enc, head_len = images_encoding(cam_high)
-            # wrist_enc, wrist_len = images_encoding(cam_wrist)
-            left_enc, left_len = images_encoding(cam_left_wrist)
-            right_enc, right_len = images_encoding(cam_right_wrist)
+            # head_enc, head_len = images_encoding(cam_high)
+            # # wrist_enc, wrist_len = images_encoding(cam_wrist)
+            # left_enc, left_len = images_encoding(cam_left_wrist)
+            # right_enc, right_len = images_encoding(cam_right_wrist)
 
-            images.create_dataset('cam_high', data=head_enc, dtype=f'S{head_len}')
-            # images.create_dataset('cam_wrist', data=wrist_enc, dtype=f'S{wrist_len}')
-            images.create_dataset('cam_left_wrist', data=left_enc, dtype=f'S{left_len}')
-            images.create_dataset('cam_right_wrist', data=right_enc, dtype=f'S{right_len}')
+            # images.create_dataset('cam_high', data=head_enc, dtype=f'S{head_len}')
+            # # images.create_dataset('cam_wrist', data=wrist_enc, dtype=f'S{wrist_len}')
+            # images.create_dataset('cam_left_wrist', data=left_enc, dtype=f'S{left_len}')
+            # images.create_dataset('cam_right_wrist', data=right_enc, dtype=f'S{right_len}')
+
+            images.create_dataset("cam_high", data=np.stack(cam_high), dtype=np.uint8)
+            images.create_dataset("cam_right_wrist", data=np.stack(cam_right_wrist), dtype=np.uint8)
+            images.create_dataset("cam_left_wrist", data=np.stack(cam_left_wrist), dtype=np.uint8)
         
         print(f"convert {hdf5_path} to rdt data format")
 

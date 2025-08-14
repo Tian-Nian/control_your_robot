@@ -16,7 +16,7 @@ class ArmController(Controller):
 
     def get_information(self):
         arm_info = {}
-        state = self.get_state()
+        state = self.get_state().copy()
         if "joint" in self.collect_info:
             arm_info["joint"] = state["joint"]
         if "qpos" in self.collect_info:
@@ -29,7 +29,7 @@ class ArmController(Controller):
             arm_info["velocity"] = state["velocity"]
         if "force" in self.collect_info:
             arm_info["force"] = state["force"]
-        return arm_info
+        return arm_info.copy()
     
     def move_controller(self, move_data:Dict[str, Any], is_delta=False):
         if is_delta:

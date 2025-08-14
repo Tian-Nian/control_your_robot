@@ -15,29 +15,28 @@ dependencies = [
     "fsspec[gcs]>=2024.6.0",
     "gym-aloha>=0.1.1",
     "imageio>=2.36.1",
-    "jax[cuda12]==0.5.0",
+    "jax[cuda12]==0.5.3",
     "jaxtyping==0.2.36",
     "lerobot",
     "ml_collections==1.0.0",
-    "numpy>=1.26.4",
+    "numpy>=1.22.4,<2.0.0",
     "numpydantic>=1.6.6",
     "opencv-python>=4.10.0.84",
     "openpi-client",
-    "orbax-checkpoint==0.11.1",
+    "orbax-checkpoint==0.11.13",
     "pillow>=11.0.0",
-    "s3fs>=2024.9.0",
     "sentencepiece>=0.2.0",
-    "torch>=2.5.1",
+    "torch>=2.7.0",
     "tqdm-loggable>=0.2",
     "typing-extensions>=4.12.2",
     "tyro>=0.9.5",
     "wandb>=0.19.1",
-    "boto3>=1.35.7",
-    "types-boto3[boto3,s3]>=1.35.7",
     "filelock>=3.16.1",
-    "beartype>=0.19.0",
+    "beartype==0.19.0",
     "treescope>=0.1.7",
     "transformers==4.48.1",
+    "rich>=14.0.0",
+    "polars>=1.30.0",
 ]
 
 
@@ -54,11 +53,19 @@ dev = [
     "matplotlib>=3.10.0",
     "pynvml>=12.0.0",
 ]
+rlds = [
+    "dlimp",
+    "tensorflow-cpu==2.15.0",
+    "tensorflow-datasets==4.9.9",
+]
 
+[tool.uv]
+override-dependencies = ["ml-dtypes==0.4.1", "tensorstore==0.1.74"]
 
 [tool.uv.sources]
 openpi-client = { workspace = true }
-lerobot = { git = "https://github.com/huggingface/lerobot", rev = "6674e368249472c91382eb54bb8501c94c7f0c56" }
+lerobot = { git = "https://github.com/huggingface/lerobot", rev = "0cf864870cf29f4738d3ade893e6fd13fbd7cdb5" }
+dlimp = { git = "https://github.com/kvablack/dlimp", rev = "ad72ce3a9b414db2185bc0b38461d4101a65477a" }
 
 [tool.uv.workspace]
 members = ["packages/*"]
@@ -110,6 +117,7 @@ ignore = [
     "T201",   # We use print statements.
     "PD008",  # Lots of false positives.
     "ISC001", # Disabling to support ruff format.
+    "LOG015", # Use logger.info.
 ]
 unfixable = [
     "B905", # Fix defaults to strict=False, which is not what we want.

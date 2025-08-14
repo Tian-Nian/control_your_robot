@@ -41,7 +41,7 @@ class CollectAny:
                 self.last_controller_data = controllers_data
                 self.episode.append(episode_data)
             else:
-                if self.move_check_success(controllers_data, tolerance=0.0001):
+                if self.move_check_success(controllers_data, tolerance=0.01):
                     self.episode.append(episode_data)
                 else:
                     now = time.monotonic()
@@ -51,6 +51,8 @@ class CollectAny:
                     self.iter += 1
                     
                 self.last_controller_data = controllers_data
+        else:
+            self.episode.append(episode_data)
     
     def get_item(self, controller_name, item):
         if item in self.episode[0][controller_name]:
@@ -95,13 +97,15 @@ class CollectAny:
         # print(f"WRITE called in PID={os.getpid()} TID={threading.get_ident()}")
         with h5py.File(hdf5_path, "w") as f:
             obs = f
+            # import pdb;pdb.set_trace()
             # print(self.episode[0])
-            print(self.episode[0].keys())
+            # print(self.episode[0].keys())
             for controller_name in self.episode[0].keys():
                 controller_group = obs.create_group(controller_name)
                 for item in self.episode[0][controller_name].keys():
                     data = self.get_item(controller_name, item)
                     controller_group.create_dataset(item, data=data)
+        
         debug_print("collect_any", f"write to {hdf5_path}", "INFO")
         # reset the episode
         self.episode = []
