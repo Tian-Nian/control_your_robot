@@ -42,9 +42,9 @@ class RealsenseSensor(VisionSensor):
             self.config.enable_device(serial)
             # self.config.disable_all_streams()
             # Enable color stream only
-            self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+            self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 60)
             if is_depth:
-                self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+                self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 60)
             
             # Start streaming
             try:

@@ -9,18 +9,23 @@ import time
 
 from utils.data_handler import is_enter_pressed,debug_print
 
+condition = {
+    "save_path": "./save/", 
+    "task_name": "test_line",  # Make_a_beef_sandwichv2
+    "save_format": "hdf5", 
+    "save_freq": 60,
+}
 
 if __name__ == "__main__":
     import os
-    os.environ["INFO_LEVEL"] = "DEBUG" # DEBUG , INFO, ERROR
+    os.environ["INFO_LEVEL"] = "INFO" # DEBUG , INFO, ERROR
 
-    import rospy
-    rospy.init_node('ros_subscriber_node', anonymous=True)
+    # import rospy
+    # rospy.init_node('ros_subscriber_node', anonymous=True)
 
-    robot = PiperDual()
+    robot = PiperDual(condition=condition, move_check=False)
     robot.set_up()
     num_episode = 10
-    robot.condition["task_name"] = "my_test"
 
     for _ in range(num_episode):
         robot.reset()
@@ -29,8 +34,13 @@ if __name__ == "__main__":
             time.sleep(1/robot.condition["save_freq"])
         
         debug_print("main", "Press Enter to finish...", "INFO")
+        
+        avg_time = 0.0
+        num = 0
 
         while True:
+            now = time.monotonic()
+
             data = robot.get()
             robot.collect(data)
             
@@ -38,4 +48,18 @@ if __name__ == "__main__":
                 robot.finish()
                 break
             
-            time.sleep(1/robot.condition["save_freq"])
+            while True:
+                last = time.monotonic()
+                if last - now >= 1/robot.condition["save_freq"]:
+                    avg_time +=last - now
+                    num += 1
+                    break
+        
+        avg_time /= num
+        extra_info = {}
+        extra_info["avg_time_interval"] = avg_time
+        robot.collection.add_extra_condition_info(extra_info)
+
+            
+
+    

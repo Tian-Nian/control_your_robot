@@ -68,7 +68,14 @@ class CollectAny:
             with open(condition_path, 'r', encoding='utf-8') as f:
                 self.condition = json.load(f)
             for key in extra_info.keys():
-                self.condition[key] = extra_info[key]
+                if key in self.condition.keys():
+                    value = self.condition[key]
+                    if not isinstance(value, list):
+                        value = [value]
+                    value.append(extra_info[key])
+                    self.condition[key] = value
+                else:
+                    self.condition[key] = extra_info[key]
         else:
             if len(self.episode) > 0:
                 for key in self.episode[0].keys():

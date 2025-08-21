@@ -44,9 +44,9 @@ START_POSITION_ANGLE_RIGHT_ARM = [
 
 condition = {
     "save_path": "./save/", 
-    "task_name": "Make_a_beef_sandwichv2", 
+    "task_name": "test_line",  # Make_a_beef_sandwichv2
     "save_format": "hdf5", 
-    "save_freq": 30,
+    "save_freq": 60,
 }
 
 class PiperDual(Robot):
@@ -126,10 +126,11 @@ if __name__ == "__main__":
             }
         }
     }
-    # robot.move(move_d)
-    data = robot.get()
-    print(data)
-    exit()
+    robot.move(move_d)
+
+    # data = robot.get()
+    # print(data)
+    # exit()
     # replay_id = 24
     # robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_head")
     # robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_left_wrist")
@@ -139,7 +140,7 @@ if __name__ == "__main__":
     # # robot.replay(f"./save/Make_a_beef_sandwich_dataset/{replay_id}.hdf5", key_banned=["qpos"]) #None
     
     # exit()
-    '''
+    # '''
     for i in range(start, start + episode_num):
         time.sleep(3)
 

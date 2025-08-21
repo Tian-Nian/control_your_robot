@@ -1,6 +1,6 @@
 import time
 import multiprocessing as mp
-from multiprocessing import Array, Process, Lock, Value, Event
+from multiprocessing import Array, Process, Lock, Value, Event, Barrier
 from typing import List
 import numpy as np
 
@@ -29,42 +29,44 @@ def worker(process_id: int, process_name: str, time_event: Event, result_array: 
 class TimeScheduler:
     '''
     时间控制器, 用于同步不同进程之间的信号量
-    time_events: 每个子进程的控制都需要有一个信号量控制循环操作, 这里就是将所有进程的信号量进行控制, List[Event]
+    work_barrier: 每个子进程的控制都需要有一个信号量控制循环操作, 这里就是将所有进程的信号量进行控制, List[Event]
     time_freq: 采集数据的频率, 实际频率可能会稍微低于该频率, 会保存最终采集平均时间间隔在数据采集的config里, int
     '''
-    def __init__(self, time_events: List[Event], time_freq=10, end_Events=None):
+    def __init__(self, work_barrier: Barrier, time_freq=10, end_barrier=None):
         self.time_freq = time_freq
-        self.time_events = time_events
-        self.end_events = end_Events
+        self.work_barrier = work_barrier
+        self.end_barrier = end_barrier
         self.process_name = "time_scheduler"
         self.real_time_accumulate_time_interval = Value('d', 0.0)
         self.step = Value('i', 0)
 
     def time_worker(self):
         last_time = time.monotonic()
+
+        i = 0
         while True:
             now = time.monotonic()
             if now - last_time >= 1 / self.time_freq:
-                if self.end_events is None and all(not event.is_set() for event in self.time_events) or \
-                    self.end_events is not None and all(event.is_set() for event in self.end_events):
-                    for event in self.time_events:
-                        event.set()  
-                        debug_print(self.process_name, "released time slot to one worker", "DEBUG")
                     
-                    if self.end_events is not None:
-                        for event in self.end_events:
-                            event.clear()
+                if  self.end_barrier is None:
+                    try:
+                        self.work_barrier.wait()
+                    except Exception as e:
+                        debug_print(self.process_name, f"{e}", "WARNING")
+                        return
+                else:
+                    self.end_barrier.wait()
                     
-                    debug_print(self.process_name, f"the actual time interval is {now - last_time}", "DEBUG")
-                    with self.real_time_accumulate_time_interval.get_lock():
-                        self.real_time_accumulate_time_interval.value = self.real_time_accumulate_time_interval.value + (now - last_time)
-                    with self.step.get_lock():
-                        self.step.value += 1
+                debug_print(self.process_name, f"the actual time interval is {now - last_time}", "DEBUG")
+                with self.real_time_accumulate_time_interval.get_lock():
+                    self.real_time_accumulate_time_interval.value = self.real_time_accumulate_time_interval.value + (now - last_time)
+                with self.step.get_lock():
+                    self.step.value += 1
 
-                    if now - last_time > 2 / self.time_freq:
-                         debug_print(self.process_name, "The current lock release time has exceeded twice the intended time interval.\n Please check whether the corresponding component's get() function is taking too long.", "WARNING")
-                         debug_print(self.process_name, f"the actual time interval is {now - last_time}", "WARNING")
-                    last_time = now
+                if now - last_time > 2 / self.time_freq:
+                        debug_print(self.process_name, "The current lock release time has exceeded twice the intended time interval.\n Please check whether the corresponding component's get() function is taking too long.", "WARNING")
+                        debug_print(self.process_name, f"the actual time interval is {now - last_time}", "WARNING")
+                last_time = now
 
     def start(self):
         '''
@@ -72,14 +74,15 @@ class TimeScheduler:
         '''
         self.time_locker = Process(target=self.time_worker)
         self.time_locker.start()
-        for event in self.time_events:
-            event.set()
+        # for event in self.work_barrier:
+        #     event.set()
+        self.work_barrier.wait()
 
     def stop(self):
         '''
         释放该时间同步器进程
         '''
-        # for event in self.time_events:
+        # for event in self.work_barrier:
         #         event.set()  # 防止卡在获取锁
         # self.time_locker.terminate()
         # self.time_locker.join()
