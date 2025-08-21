@@ -83,6 +83,7 @@ class BiSocket:
         try:
             serialized = pickle.dumps(data)
             self.conn.sendall(len(serialized).to_bytes(4, 'big') + serialized)
+            debug_print("BiSocket", "send data success!", "DEBUG")
         except Exception as e:
             debug_print("BiSocket",f"Send failed: {e}", "ERROR")
             self.close()

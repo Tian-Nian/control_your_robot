@@ -54,12 +54,14 @@ class PI0_DUAL:
     # set language randomly
     def random_set_language(self):
         # json_Path =f"datasets/instructions/{self.task_name}.json"
-        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        json_Path = os.path.join(root_dir, "task_instructions", f"{self.task_name}.json")
-        with open(json_Path, 'r') as f_instr:
-            instruction_dict = json.load(f_instr)
-        instructions = instruction_dict['instructions']
-        instruction = np.random.choice(instructions)
+        # root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        # json_Path = os.path.join(root_dir, "task_instructions", f"{self.task_name}.json")
+        # with open(json_Path, 'r') as f_instr:
+        #     instruction_dict = json.load(f_instr)
+        # instructions = instruction_dict['instructions']
+        # instruction = np.random.choice(instructions)
+
+        instruction = "Make me a beef sandwich."
         self.instruction = instruction
         print(f"successfully set instruction:{instruction}")
     

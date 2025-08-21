@@ -13,6 +13,8 @@ from data.collect_any import CollectAny
 
 from utils.data_handler import is_enter_pressed
 
+import time, os
+
 # setting your realsense serial
 CAMERA_SERIALS = {
     'head': '342622301553',  # Replace with actual serial number
@@ -42,14 +44,14 @@ START_POSITION_ANGLE_RIGHT_ARM = [
 
 condition = {
     "save_path": "./save/", 
-    "task_name": "task1", 
+    "task_name": "Make_a_beef_sandwichv2", 
     "save_format": "hdf5", 
-    "save_freq": 10,
+    "save_freq": 30,
 }
 
 class PiperDual(Robot):
-    def __init__(self, **args):
-        super().__init__(**args)
+    def __init__(self, condition=condition, move_check=True, start_episode=0):
+        super().__init__(condition=condition, move_check=move_check, start_episode=start_episode)
 
         self.controllers = {
             "arm":{
@@ -64,7 +66,6 @@ class PiperDual(Robot):
                 "cam_right_wrist": RealsenseSensor("cam_right_wrist"),
             },
         }
-        self.condition = condition
 
     def reset(self):
         self.controllers["arm"]["left_arm"].reset(START_POSITION_ANGLE_LEFT_ARM)
@@ -83,19 +84,38 @@ class PiperDual(Robot):
                                })
         
         print("set up success!")
+    
+    def reset(self):
+        move_data = {
+            "arm":{
+                "left_arm":{
+                    "joint": np.array([0.0, 0.0, 0.0, 0.0 ,0.0, 0.0]),
+                    "gripper": 1.0 / 0.7,
+                },
+                "right_arm":{
+                    "joint": np.array([0.0, 0.0, 0.0, 0.0 ,0.0, 0.0]),
+                    "gripper": 1.0 / 0.7,
+                }
+            }
+        }
+
+        self.move(move_data)
+        time.sleep(1)
+
 
 if __name__ == "__main__":
-    import time, os
     os.environ["INFO_LEVEL"] = "INFO"
 
     # import rospy
     # rospy.init_node('ros_subscriber_node', anonymous=True)
     start = 0
     episode_num = 50
-    robot = PiperDual(move_check=True)
+    robot = PiperDual(condition=condition, move_check=True)
+    
     robot.set_up()
-    '''
-    # 回到零位
+    
+    # replay data
+    ## 回到零位
     move_d = {
         "arm":{
             "left_arm":{
@@ -106,17 +126,19 @@ if __name__ == "__main__":
             }
         }
     }
-    robot.move(move_d)
-
-    replay_id = 24
-    robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_head")
-    robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_left_wrist")
-    robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_right_wrist")
-    
-    robot.replay(f"./save/base/24.hdf5", key_banned=["qpos"])
-    # robot.replay(f"./save/Make_a_beef_sandwich/{replay_id}.hdf5", key_banned=None)
-    
+    # robot.move(move_d)
+    data = robot.get()
+    print(data)
     exit()
+    # replay_id = 24
+    # robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_head")
+    # robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_left_wrist")
+    # robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_right_wrist")
+    
+    # robot.replay(f"./save/base/24.hdf5", key_banned=["qpos"])
+    # # robot.replay(f"./save/Make_a_beef_sandwich_dataset/{replay_id}.hdf5", key_banned=["qpos"]) #None
+    
+    # exit()
     '''
     for i in range(start, start + episode_num):
         time.sleep(3)
@@ -152,3 +174,4 @@ if __name__ == "__main__":
         e = time.time()
 
         print(f"time {e-s}s")
+    #'''

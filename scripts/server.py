@@ -5,7 +5,7 @@ import socket
 import time
 
 from utils.bisocket import BiSocket
-from policy.test_policy.inference_model import TestModel
+from policy.openpi.inference_model import PI0_DUAL
 from utils.data_handler import debug_print
 
 class Server:
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     port = 10000
 
     DoFs = 6
-    model = TestModel("path/to/mmodel","test", DoFs=DoFs, is_dual=True)
+    model = PI0_DUAL("path/to/mmodel","task_name")
 
     server = Server(model)
 

@@ -57,6 +57,7 @@ class RealsenseSensor(VisionSensor):
             raise RuntimeError(f"Failed to initialize camera: {str(e)}")
 
     def get_image(self):
+        curr_timestamp = time.time()
         image = {}
         frame = self.pipeline.wait_for_frames()
 
@@ -78,7 +79,8 @@ class RealsenseSensor(VisionSensor):
                     raise RuntimeError("Failed to get depth frame.")
                 depth_image = np.asanyarray(depth_frame.get_data()).copy()
                 image["depth"] = depth_image
-        
+        end_timestamp = time.time()
+        # print(f'curr is : {curr_timestamp}, end is :{end_timestamp}, duration is : {end_timestamp - curr_timestamp}')
         return image
 
     def cleanup(self):

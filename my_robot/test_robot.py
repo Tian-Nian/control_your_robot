@@ -19,7 +19,7 @@ condition = {
 
 class TestRobot(Robot):
     def __init__(self, DoFs=6,INFO="DEBUG",start_episode=0):
-        super().__init__()  
+        super().__init__(condition, start_episode)  
         
         self.INFO = INFO
         self.DoFs = DoFs

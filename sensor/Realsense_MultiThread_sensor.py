@@ -71,7 +71,7 @@ class RealsenseSensor(VisionSensor):
     def get_image(self):
         image = {}
         frame = self.pipeline.wait_for_frames()
-
+        curr_timestamp = time.time()
         if "color" in self.collect_info:
             color_frame = frame.get_color_frame()
             if not color_frame:
@@ -90,6 +90,8 @@ class RealsenseSensor(VisionSensor):
                     raise RuntimeError("Failed to get depth frame.")
                 depth_image = np.asanyarray(depth_frame.get_data()).copy()
                 image["depth"] = depth_image
+        end_timestamp = time.time()
+        print(f'curr is : {curr_timestamp}, end is :{end_timestamp}, duration is : {end_timestamp - curr_timestamp}')
         return image
 
     def _update_frames(self):

@@ -1,7 +1,7 @@
 python example/deploy/deploy.py \
-    --model_name "openpi"\
-    --model_class "PI_DUAL"\
-    --model_path "path/to/ckpt"\
+    --model_name "ACT"\
+    --model_class "MYACT"\
+    --model_path "/home/agilex/project/control_your_robot/policy/ACT/act_ckpt/act-Make_a_beef_sandwich/Make_a_beef_sandwichV2-50"\
     --task_name "test"\
-    --robot_name "test_robot"\
-    --robot_class "TestRobot"\
+    --robot_name "agilex_piper_dual_base"\
+    --robot_class "PiperDual"

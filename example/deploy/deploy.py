@@ -55,14 +55,14 @@ def get_class(import_name, class_name):
 def init():
     parser = argparse.ArgumentParser()
     
-    parser.add_argument("--model_name", type=str, required=True, help="Name of the task")  # 如果你用得上
+    parser.add_argument("--model_name", type=str, required=True, help="Name of the task") 
     parser.add_argument("--model_class", type=str, required=True, help="Name of the model class")
     parser.add_argument("--model_path", type=str, required=True, help="model path, e.g., policy/RDT/checkpoints/checkpoint-10000")
     parser.add_argument("--task_name", type=str, required=True, help="task name, read intructions from task_instuctions/{task_name}.json")
     parser.add_argument("--robot_name", type=str, required=True, help="robot name, read my_robot/{robot_name}.py")
     parser.add_argument("--robot_class", type=str, required=True, help="robot class, get class from my_robot/{robot_name}.py")
     parser.add_argument("--episode_num", type=int, required=False,default=10, help="how many episode you want to deploy")
-    parser.add_argument("--max_step", type=int, required=False,default=100, help="the maxinum step for each episode")
+    parser.add_argument("--max_step", type=int, required=False,default=100000, help="the maxinum step for each episode")
     
     args = parser.parse_args()
     model_name = args.model_name
@@ -79,7 +79,8 @@ def init():
     model = model_class(model_path, task_name)
 
     robot_class = get_class(f"my_robot.{robot_name}", robot_class)
-    robot = robot_class()
+    condition = get_class(f"my_robot.{robot_name}", "condition")
+    robot = robot_class(condition=condition)
 
     return model, robot, episode_num, max_step
 
@@ -108,6 +109,12 @@ if __name__ == "__main__":
 
         # 开始逐条推理运行
         while step < max_step and is_start:
+            # while True:
+            #     if is_enter_pressed():
+            #         break
+            #     else:
+            #         time.sleep(0.01)
+            time.sleep(0.05)
             data = robot.get()
             img_arr, state = input_transform(data)
             model.update_observation_window(img_arr, state)
@@ -118,7 +125,16 @@ if __name__ == "__main__":
                 move_data = output_transform(action)
                 robot.move(move_data)
                 step += 1
-                time.sleep(1/robot.condition["save_freq"])
+                # time.sleep(1/robot.condition["save_freq"])
+                now = time.monotonic()
+                while True:
+                    last = time.monotonic()
+                    if last - now >= 1/robot.condition["save_freq"]:
+                        print(f"{last - now >= 1/robot.condition['save_freq']}s")
+                        break
+                    else:
+                        time.sleep(0.001) 
+
                 if step >= max_step or is_enter_pressed():
                     debug_print("main", "enter pressed, the episode end", "INFO")
                     is_start = False

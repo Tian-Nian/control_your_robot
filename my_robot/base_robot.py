@@ -26,6 +26,7 @@ condition = {
 
 class Robot:
     def __init__(self, 
+            condition,
             move_check=False,
             start_episode=0) -> None:
 
@@ -101,9 +102,8 @@ class Robot:
 
         episode = dict_to_list(hdf5_groups_to_dict(data_path))
         for ep in episode:
-            import pdb
             cv2.imshow("pic", ep[pic_name]["color"])
-            cv2.waitKey(10)
+            cv2.waitKey(33)
 
     def replay(self, data_path, key_banned=None, is_collect=False, episode_id=None):
         parent_dir = os.path.dirname(data_path)

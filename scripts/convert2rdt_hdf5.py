@@ -65,9 +65,26 @@ def convert(hdf5_paths, output_path, start_index=0):
         index += 1
         print(data.keys())
         with h5py.File(hdf5_output_path, "w") as f:
-            action = np.array(get_item(data, map["action"])).astype(np.float32)
+            # 降采样
+            input_data = {}
 
-            f.create_dataset('action', data=np.array(action), dtype="float32")
+            for key in map.keys():
+                input_data[key] = get_item(data, map[key])[::3]
+
+            qpos = np.array(input_data["qpos"]).astype(np.float32)
+            
+            actions = []
+
+            for i in range(len(qpos) - 1):
+                actions.append(qpos[i+1])
+            
+            last_action = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+            
+            # 最后一帧结束无动作
+            actions.append(last_action)
+
+            actions = np.array(actions)
+            f.create_dataset('action', data=np.array(actions), dtype="float32")
 
             obs = f.create_group("observations")
             '''
@@ -75,7 +92,6 @@ def convert(hdf5_paths, output_path, start_index=0):
             you can rename them to avoid confusion instead of calling them qpos, 
             but remember to update the corresponding model’s data loading phase accordingly.
             '''
-            qpos = np.array(get_item(data, map["qpos"])).astype(np.float32)
 
             obs.create_dataset('qpos', data=np.array(qpos), dtype="float32")
             obs.create_dataset("left_arm_dim", data=np.array(6))
@@ -85,10 +101,9 @@ def convert(hdf5_paths, output_path, start_index=0):
             
             # Retrieve data based on your camera/view names, then encode and compress it for storage.
 
-            cam_high = get_item(data, map["cam_high"])
-            # cam_wrist = get_item(data, map["cam_wrist"])
-            cam_left_wrist = get_item(data, map["cam_left_wrist"])
-            cam_right_wrist = get_item(data, map["cam_right_wrist"])
+            cam_high = input_data["cam_high"]
+            cam_left_wrist = input_data["cam_left_wrist"]
+            cam_right_wrist = input_data["cam_right_wrist"]
             
             # head_enc, head_len = images_encoding(cam_high)
             # # wrist_enc, wrist_len = images_encoding(cam_wrist)
@@ -103,26 +118,28 @@ def convert(hdf5_paths, output_path, start_index=0):
             images.create_dataset("cam_high", data=np.stack(cam_high), dtype=np.uint8)
             images.create_dataset("cam_right_wrist", data=np.stack(cam_right_wrist), dtype=np.uint8)
             images.create_dataset("cam_left_wrist", data=np.stack(cam_left_wrist), dtype=np.uint8)
-        
-        print(f"convert {hdf5_path} to rdt data format")
+
+        print(f"convert {hdf5_path} to rdt data format at {hdf5_output_path}")
 
 if __name__ == "__main__":
     import argparse
     import json
-    parser = argparse.ArgumentParser(description='Transform datasets typr to HDF5.')
-    parser.add_argument('data_path', type=str,
-                        help="your data dir like: datasets/task/")
-    parser.add_argument('outout_path', type=str,default=None,
-                        help='output path commanded like datasets/RDT/...')
+    # parser = argparse.ArgumentParser(description='Transform datasets typr to HDF5.')
+    # parser.add_argument('data_path', type=str,
+    #                     help="your data dir like: datasets/task/")
+    # parser.add_argument('outout_path', type=str,default=None,
+    #                     help='output path commanded like datasets/RDT/...')
     
-    args = parser.parse_args()
-    data_path = args.data_path
-    output_path = args.outout_path
-    if output_path is None:
-        data_config = json.load(os.path.join(data_path, "config.json"))
-        output_path = f"./datasets/RDT/{data_config['task_name']}"
+    # args = parser.parse_args()
+    # data_path = args.data_path
+    # output_path = args.outout_path
+    data_path = "save/Make_a_beef_sandwichv2/"
+    output_path = "/home/agilex/project/RoboTwin/policy/ACT/processed_data/real-Make_a_beef_sandwich-10fps/Make_a_beef_sandwich-50/"
+
+    # if output_path is None:
+    #     data_config = json.load(os.path.join(data_path, "config.json"))
+    #     output_path = f"./datasets/RDT/{data_config['task_name']}"
     
     hdf5_paths = get_files(data_path, "*.hdf5")
     print("hdf5 files:\n",hdf5_paths)
     convert(hdf5_paths, output_path)
-
