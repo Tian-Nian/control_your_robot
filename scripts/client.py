@@ -19,7 +19,7 @@ class Replay:
     def get_data(self):
         print(self.episode[self.ptr].keys())
         data = self.episode[self.ptr], self.episode[self.ptr]
-        self.ptr += 1 
+        self.ptr += 30
         return data
     
 def input_transform(data):
@@ -71,10 +71,15 @@ class Client:
         action_chunk = message["action_chunk"]
         action_chunk = np.array(action_chunk)
 
-        for action in action_chunk[:10]:
+        for action in action_chunk[:30]:
             move_data = output_transform(action)
+            # if move_data["arm"]["left_arm"]["gripper"] < 0.5 :
+            #     move_data["arm"]["left_arm"]["gripper"] = 0.0
+            # if move_data["arm"]["right_arm"]["gripper"] < 0.5 :
+            #     move_data["arm"]["right_arm"]["gripper"] = 0.0
+            
             self.robot.move(move_data)
-            time.sleep(0.033)
+            time.sleep(0.1)
 
     def play_once(self, R=None):
         if R:
@@ -136,7 +141,12 @@ if __name__ == "__main__":
             # client.play_once()
             print(f"play once:{i}")
 
-            time.sleep(1)
+            # time.sleep(3)
+            while True:
+                if is_enter_pressed():
+                    break
+                else:
+                    time.sleep(0.1)
         except:
             client.close()
     client.close()

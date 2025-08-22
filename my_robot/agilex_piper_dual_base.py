@@ -44,9 +44,9 @@ START_POSITION_ANGLE_RIGHT_ARM = [
 
 condition = {
     "save_path": "./save/", 
-    "task_name": "test_line",  # Make_a_beef_sandwichv2
+    "task_name": "Make_a_beef_sandwichv3",  # Make_a_beef_sandwichv2
     "save_format": "hdf5", 
-    "save_freq": 60,
+    "save_freq": 30,
 }
 
 class PiperDual(Robot):
@@ -90,11 +90,11 @@ class PiperDual(Robot):
             "arm":{
                 "left_arm":{
                     "joint": np.array([0.0, 0.0, 0.0, 0.0 ,0.0, 0.0]),
-                    "gripper": 1.0 / 0.7,
+                    "gripper": 0.0 / 0.7,
                 },
                 "right_arm":{
                     "joint": np.array([0.0, 0.0, 0.0, 0.0 ,0.0, 0.0]),
-                    "gripper": 1.0 / 0.7,
+                    "gripper": 0.0 / 0.7,
                 }
             }
         }
@@ -108,14 +108,14 @@ if __name__ == "__main__":
 
     # import rospy
     # rospy.init_node('ros_subscriber_node', anonymous=True)
-    start = 0
+    start = 48
     episode_num = 50
     robot = PiperDual(condition=condition, move_check=True)
     
     robot.set_up()
     
     # replay data
-    ## 回到零位
+    # 回到零位
     move_d = {
         "arm":{
             "left_arm":{
@@ -131,12 +131,12 @@ if __name__ == "__main__":
     # data = robot.get()
     # print(data)
     # exit()
-    # replay_id = 24
-    # robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_head")
+    # replay_id = 10
+    # robot.show_pic(f"./save/Make_a_beef_sandwichv2/{replay_id}.hdf5", "cam_head")
     # robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_left_wrist")
     # robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_right_wrist")
     
-    robot.replay(f"./save/Make_a_beef_sandwichv2/10.hdf5", key_banned=["joint","qpos"])
+    robot.replay(f"./save/Make_a_beef_sandwichv3/0.hdf5", key_banned=["qpos"])
     # robot.replay(f"./save/Make_a_beef_sandwich_dataset/{replay_id}.hdf5", key_banned=["qpos"]) #None
     
     exit()
@@ -165,7 +165,7 @@ if __name__ == "__main__":
                 if now - last_time >= 1 / condition["save_freq"]:
                     break
                 else:
-                    time.sleep(0.01)
+                    time.sleep(0.001)
 
             time.sleep(1/condition["save_freq"])
             

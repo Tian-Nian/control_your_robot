@@ -1,7 +1,7 @@
 import time
 import multiprocessing as mp
 from multiprocessing import Array, Process, Lock, Value, Event, Barrier
-from typing import List
+from typing import List, Optional
 import numpy as np
 
 DEBUG = False
@@ -32,30 +32,76 @@ class TimeScheduler:
     work_barrier: 每个子进程的控制都需要有一个信号量控制循环操作, 这里就是将所有进程的信号量进行控制, List[Event]
     time_freq: 采集数据的频率, 实际频率可能会稍微低于该频率, 会保存最终采集平均时间间隔在数据采集的config里, int
     '''
-    def __init__(self, work_barrier: Barrier, time_freq=10, end_barrier=None):
-        self.time_freq = time_freq
+    def __init__(
+        self,
+        work_events: Optional[List[Event]] = None,
+        work_barrier: Optional[Barrier] = None,
+        time_freq: int = 10,
+        end_events: Optional[List[Event]] = None,
+        end_barrier: Optional[Barrier] = None
+    ):
+
+        self.time_freq = int(time_freq)
+        if self.time_freq <= 0:
+            raise ValueError("time_freq must be positive.")
+
+        # 工作触发两种模式：二选一
+        self.work_events = work_events
         self.work_barrier = work_barrier
+
+        # 完成同步两种模式：可都不给（则不等待）
+        self.end_events = end_events
         self.end_barrier = end_barrier
+
+        # 校验“二选一”
+        if (self.work_events is None) == (self.work_barrier is None):
+            raise ValueError("Exactly one of work_events or work_barrier must be provided.")
+
+        if self.work_events is not None and len(self.work_events) == 0:
+            raise ValueError("work_events must be a non-empty list when provided.")
+
+        if self.end_events is not None and self.end_barrier is not None:
+            raise ValueError("end_events and end_barrier cannot both be set; choose one.")
+
+        # 统计信息
         self.process_name = "time_scheduler"
         self.real_time_accumulate_time_interval = Value('d', 0.0)
         self.step = Value('i', 0)
 
+        # 控制
+        self.stop_event = Event()
+        self._proc: Optional[Process] = None
+
     def time_worker(self):
         last_time = time.monotonic()
-
-        i = 0
         while True:
             now = time.monotonic()
             if now - last_time >= 1 / self.time_freq:
-                    
-                if  self.end_barrier is None:
-                    try:
-                        self.work_barrier.wait()
-                    except Exception as e:
-                        debug_print(self.process_name, f"{e}", "WARNING")
-                        return
+                # 触发条件获取
+                if  self.end_barrier is None and self.end_events is None:
+                    # 并行自触发
+                    if self.work_barrier:
+                        try:
+                            self.work_barrier.wait()
+                        except Exception as e:
+                            debug_print(self.process_name, f"{e}", "WARNING")
+                            return
+                    else:
+                        while True:
+                            if all(not event.is_set() for event in self.work_events):
+                                break
+                            else:
+                                time.sleep(0.00001)
                 else:
-                    self.end_barrier.wait()
+                    # 链式结构触发
+                    if self.end_barrier:
+                        self.end_barrier.wait()
+                    else:
+                        while True:
+                            if all(event.is_set() for event in self.end_events):
+                                break
+                            else:
+                                time.sleep(0.00001)
                     
                 debug_print(self.process_name, f"the actual time interval is {now - last_time}", "DEBUG")
                 with self.real_time_accumulate_time_interval.get_lock():
@@ -68,15 +114,27 @@ class TimeScheduler:
                         debug_print(self.process_name, f"the actual time interval is {now - last_time}", "WARNING")
                 last_time = now
 
+                # 释放触发条件
+                if self.work_events:
+                    for event in self.work_events:
+                        event.set()
+                
+                if self.end_events:
+                    for event in self.end_events:
+                        event.clear()
+
     def start(self):
         '''
         开启时间同步器进程
         '''
         self.time_locker = Process(target=self.time_worker)
         self.time_locker.start()
-        # for event in self.work_barrier:
-        #     event.set()
-        self.work_barrier.wait()
+        if self.work_barrier:
+            self.work_barrier.wait()
+        else:
+            for event in self.work_events:
+                event.set()
+        
 
     def stop(self):
         '''

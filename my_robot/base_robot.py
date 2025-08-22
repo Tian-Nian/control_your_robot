@@ -123,6 +123,7 @@ class Robot:
                 data = self.get()
                 self.collect(data)
             self.play_once(ep, key_banned)
+            # import pdb;pdb.set_trace()
             print(now_time - last_time , "s")
 
             last_time = time.monotonic()
@@ -139,8 +140,6 @@ class Robot:
                             controller_name: episode[controller_name],
                         },
                     }
-                    # import pdb
-                    # pdb.set_trace()
                     self.move(move_data, key_banned=key_banned)
 
 def get_array_length(data: Dict[str, Any]) -> int:

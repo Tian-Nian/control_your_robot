@@ -15,7 +15,7 @@ import rospy
 import importlib
 
 def ComponentWorker(component_class_name, component_name, component_setup_input, component_collect_info, data_buffer: DataBuffer,
-                time_lock: Barrier, start_event: Event, finish_event: Event, process_name: str):
+                time_lock, start_event: Event, finish_event: Event, process_name: str):
     '''
     组件级别的多进程同步器, 用于多进程数据采集, 如果希望是多进程的同步控制也可以稍微改下代码添加一个共享的信号输入
     输入:
@@ -66,12 +66,14 @@ def ComponentWorker(component_class_name, component_name, component_setup_input,
             # try:
             data = component.get()
             # data_buffer.collect(component.name, data)
+            print(data.keys())
             data_buffer[component.name].append(data)
 
             # except Exception as e:
             #     debug_print(process_name, f"Error: {e}", "ERROR")
-            
-            # time_lock.clear()
+            # if isinstance(time_lock, Event):
+            if hasattr(time_lock, "clear"):
+                time_lock.clear()
             debug_print(process_name, "Data processed. Waiting for next time slot.", "DEBUG")
         
         debug_print(process_name, "Finish event triggered. Finalizing...","INFO")

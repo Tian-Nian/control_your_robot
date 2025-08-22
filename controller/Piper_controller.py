@@ -59,7 +59,7 @@ class PiperController(ArmController):
         j1, j2, j3 ,j4, j5, j6 = joint * 57295.7795 #1000*180/3.1415926
         j1, j2, j3 ,j4, j5, j6 = int(j1), int(j2), int(j3), int(j4), int(j5), int(j6)
 
-        self.controller.MotionCtrl_2(0x01, 0x01, 100, 0x00)
+        self.controller.MotionCtrl_2(0x01, 0x01, 100, 0xAD)
         self.controller.JointCtrl(j1, j2, j3, j4, j5, j6)
     
     # def set_joint(self, joint):

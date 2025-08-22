@@ -102,7 +102,7 @@ if __name__ == "__main__":
         slave = SlaveWorker("slave_arm", start_event, end_event, master.data_buffer)
         data = DataWorker("collect_data", start_event, end_event, slave.data_buffer, episode_id=i)
 
-        time_scheduler = TimeScheduler([master.forward_event], time_freq=30, end_Events=[data.next_event])
+        time_scheduler = TimeScheduler(work_events=[master.forward_event], time_freq=30, end_events=[data.next_event])
         
         master.next_to(slave)
         slave.next_to(data)
