@@ -19,7 +19,7 @@ class Replay:
     def get_data(self):
         print(self.episode[self.ptr].keys())
         data = self.episode[self.ptr], self.episode[self.ptr]
-        self.ptr += 10 
+        self.ptr += 1 
         return data
     
 def input_transform(data):
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     import os
     os.environ["INFO_LEVEL"] = "DEBUG"
     
-    ip = "192.3.8.41"
+    ip = "192.3.8.74"
     port = 10000
 
     DoFs = 6
@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
     bisocket = BiSocket(client_socket, client.move)
     client.set_up(bisocket)
-    re = Replay("save/Make_a_beef_sandwichv2/0.hdf5")
+    re = Replay("save/Make_a_beef_sandwichv2/10.hdf5")
 
     while True:
         if is_enter_pressed():

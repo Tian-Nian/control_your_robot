@@ -11,9 +11,9 @@ from utils.data_handler import is_enter_pressed,debug_print
 
 condition = {
     "save_path": "./save/", 
-    "task_name": "test_line",  # Make_a_beef_sandwichv2
+    "task_name": "Make_a_beef_sandwichv3",  # Make_a_beef_sandwichv2
     "save_format": "hdf5", 
-    "save_freq": 60,
+    "save_freq": 30,
 }
 
 if __name__ == "__main__":
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     # import rospy
     # rospy.init_node('ros_subscriber_node', anonymous=True)
 
-    robot = PiperDual(condition=condition, move_check=False)
+    robot = PiperDual(condition=condition, move_check=True)
     robot.set_up()
     num_episode = 10
 
@@ -59,7 +59,3 @@ if __name__ == "__main__":
         extra_info = {}
         extra_info["avg_time_interval"] = avg_time
         robot.collection.add_extra_condition_info(extra_info)
-
-            
-
-    

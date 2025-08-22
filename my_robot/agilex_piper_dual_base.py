@@ -136,10 +136,10 @@ if __name__ == "__main__":
     # robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_left_wrist")
     # robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_right_wrist")
     
-    # robot.replay(f"./save/base/24.hdf5", key_banned=["qpos"])
-    # # robot.replay(f"./save/Make_a_beef_sandwich_dataset/{replay_id}.hdf5", key_banned=["qpos"]) #None
+    robot.replay(f"./save/Make_a_beef_sandwichv2/10.hdf5", key_banned=["joint","qpos"])
+    # robot.replay(f"./save/Make_a_beef_sandwich_dataset/{replay_id}.hdf5", key_banned=["qpos"]) #None
     
-    # exit()
+    exit()
     # '''
     for i in range(start, start + episode_num):
         time.sleep(3)
