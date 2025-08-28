@@ -7,6 +7,8 @@ import fnmatch
 import sys
 import select
 
+import curses
+
 from scipy.spatial.transform import Rotation
 
 def apply_local_offset_to_global_pose(T_offset, T_current):
@@ -202,12 +204,6 @@ def debug_print(name, info, level="INFO"):
     endc = colors["ENDC"]
     print(f"{color}[{level}][{name}] {info}{endc}")
 
-def is_enter_pressed():
-    return select.select([sys.stdin], [], [], 0)[0] and sys.stdin.read(1) == '\n'    
-
-def is_space_pressed():
-    return select.select([sys.stdin], [], [], 0)[0] and sys.stdin.read(1) == ' '    
-
 class DataBuffer:
     '''
     一个用于共享存储不同组件采集的数据的信息的类
@@ -225,3 +221,46 @@ class DataBuffer:
 
     def get(self):
         return dict(self.buffer)
+    
+import sys
+import select
+import tty
+import termios
+
+class KeyListener:
+    """
+    非阻塞按键监听 (Linux/macOS)
+    - get_key() 返回一个字符，空格返回 ' '，回车返回 '\n'
+    - 没有按键返回 None
+    - 可与普通 print() 日志共存
+    使用:
+        with KeyListener() as kl:
+            while True:
+                key = kl.get_key()
+                if key == ' ':
+                    print("空格被按下")
+                elif key == '\n':
+                    print("回车被按下")
+                elif key == 'q':
+                    print("退出")
+                    break
+    """
+    def __init__(self):
+        self.fd = sys.stdin.fileno()
+        self.old_settings = None
+
+    def __enter__(self):
+        self.old_settings = termios.tcgetattr(self.fd)
+        tty.setcbreak(self.fd)  # 设置为 cbreak 模式，输入不需要回车
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.old_settings:
+            termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old_settings)
+
+    def get_key(self):
+        """非阻塞读取按键，没有按键返回 None"""
+        dr, _, _ = select.select([sys.stdin], [], [], 0)
+        if dr:
+            return sys.stdin.read(1)
+        return None

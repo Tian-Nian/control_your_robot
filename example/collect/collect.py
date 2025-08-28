@@ -7,7 +7,9 @@ from my_robot.test_robot import TestRobot
 
 import time
 
-from utils.data_handler import is_enter_pressed, is_space_pressed,debug_print
+from utils.data_handler import KeyListener, debug_print
+
+import keyboard
 
 
 if __name__ == "__main__":
@@ -18,14 +20,15 @@ if __name__ == "__main__":
     robot.set_up()
     num_episode = 5
 
+    # kc = KeyListener()
     for _ in range(num_episode):
         robot.reset()
         debug_print("main", "Press Enter to start...", "INFO")
-        while not robot.is_start() or not is_enter_pressed():
+        while not robot.is_start() or not  keyboard.is_pressed("\n"):
             time.sleep(1/robot.condition["save_freq"])
         
         debug_print("main", "Press Enter to finish...", "INFO")
-
+        time.sleep(1)
         avg_collect_time = 0.0
         collect_num = 0
         while True:
@@ -34,9 +37,13 @@ if __name__ == "__main__":
             data = robot.get()
             robot.collect(data)
 
-            if is_enter_pressed():
+            # key = kc.get_key()
+
+            if keyboard.is_pressed("\n"):
                 robot.finish()
                 break
+            elif keyboard.is_pressed(" "):
+                robot.collection.next_subtask()
                 
             collect_num += 1
             while True:
