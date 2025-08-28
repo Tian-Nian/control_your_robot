@@ -18,8 +18,11 @@ condition = {
 }
 
 class TestRobot(Robot):
-    def __init__(self, DoFs=6,INFO="DEBUG",start_episode=0):
-        super().__init__()  
+    def __init__(self, condition=condition, 
+                 DoFs=6,INFO="DEBUG", 
+                 start_episode=0,
+                 sub_task=False):
+        super().__init__(condition=condition, start_episode=start_episode,sub_task=sub_task)  
         
         self.INFO = INFO
         self.DoFs = DoFs
@@ -36,8 +39,8 @@ class TestRobot(Robot):
                 "cam_right_wrist": TestVisonSensor("cam_right_wrist",INFO=self.INFO),
             }, 
         }
-        self.condition = condition
-        self.collection = CollectAny(condition, start_episode=start_episode)
+        # self.condition = condition
+        # self.collection = CollectAny(condition, start_episode=start_episode)
     
     def reset(self):
         self.controllers["arm"]["left_arm"].reset(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))

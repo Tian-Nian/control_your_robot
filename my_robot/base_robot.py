@@ -28,14 +28,15 @@ class Robot:
     def __init__(self, 
                 condition=condition,
                 move_check=True, 
-                start_episode=0) -> None:
+                start_episode=0,
+                sub_task=False) -> None:
         
         self.name = "base_robot"
         self.controllers = {}
         self.sensors = {}
 
         self.condition = condition
-        self.collection = CollectAny(condition, move_check=move_check, start_episode=start_episode)
+        self.collection = CollectAny(condition, move_check=move_check, start_episode=start_episode, sub_task=sub_task)
 
     def set_up(self):
         debug_print(self.name, "set_up() should be realized by your robot class", "ERROR")

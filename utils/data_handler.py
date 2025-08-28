@@ -205,6 +205,9 @@ def debug_print(name, info, level="INFO"):
 def is_enter_pressed():
     return select.select([sys.stdin], [], [], 0)[0] and sys.stdin.read(1) == '\n'    
 
+def is_space_pressed():
+    return select.select([sys.stdin], [], [], 0)[0] and sys.stdin.read(1) == ' '    
+
 class DataBuffer:
     '''
     一个用于共享存储不同组件采集的数据的信息的类

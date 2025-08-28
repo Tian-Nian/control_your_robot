@@ -16,12 +16,16 @@ import h5py
 import json
 
 class CollectAny:
-    def __init__(self, condition=None, start_episode=0, move_check=True):
+    def __init__(self, condition=None, start_episode=0, move_check=True, sub_task=False):
         self.condition = condition
         self.episode = []
         self.episode_index = start_episode
         self.move_check = move_check
         self.last_controller_data = None
+        self.sub_task = sub_task
+        
+        if self.sub_task:
+            self.subtask_id = 0
     
     def collect(self, controllers_data, sensors_data):
         episode_data = {}
@@ -37,13 +41,17 @@ class CollectAny:
                 self.last_controller_data = controllers_data
                 self.episode.append(episode_data)
             else:
-                if self.move_check_success(controllers_data, tolerance=0.01):
+                if self.move_check_success(controllers_data, tolerance=0.0001):
                     self.episode.append(episode_data)
                 else:
                     debug_print("collect_any", f"robot is not moving, skip this frame!", "INFO")
                 self.last_controller_data = controllers_data
         else:
             self.episode.append(episode_data)
+        
+        if self.sub_task:
+            self.episode[-1]["subtask"] = {}
+            self.episode[-1]["subtask"]["subtask_id"] = self.subtask_id
     
     def get_item(self, controller_name, item):
         if item in self.episode[0][controller_name]:
@@ -51,6 +59,13 @@ class CollectAny:
         else:
             debug_print("collect_any", f"item {item} not in {controller_name}", "ERROR")
             return None
+    
+    def next_subtask(self, subtask=None):
+        self.subtask_id += 1
+        if subtask:
+            debug_print("collect_any", f"chanhge to next task:{subtask}", "INFO")
+        else:
+            debug_print("collect_any", f"change to next task.", "INFO")
         
     def add_extra_condition_info(self, extra_info):
         save_path = os.path.join(self.condition["save_path"], f"{self.condition['task_name']}/")
@@ -88,16 +103,18 @@ class CollectAny:
 
              with open(condition_path, 'w', encoding='utf-8') as f:
                  json.dump(self.condition, f, ensure_ascii=False, indent=4)
+        
         if not episode_id is None:
             hdf5_path = os.path.join(save_path, f"{episode_id}.hdf5")
         else:
             hdf5_path = os.path.join(save_path, f"{self.episode_index}.hdf5")
         
         # print(f"WRITE called in PID={os.getpid()} TID={threading.get_ident()}")
+
         with h5py.File(hdf5_path, "w") as f:
             obs = f
-            # print(self.episode[0])
-            print(self.episode[0].keys())
+            # print(self.episode[0].keys())
+
             for controller_name in self.episode[0].keys():
                 controller_group = obs.create_group(controller_name)
                 for item in self.episode[0][controller_name].keys():
