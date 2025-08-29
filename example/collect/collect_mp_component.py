@@ -6,8 +6,8 @@ from multiprocessing import Process, Manager, Event, Semaphore, Barrier
 
 from data.collect_any import CollectAny
 
-# from sensor.TestVision_sensor import TestVisonSensor
-# from controller.TestArm_controller import TestArmController
+from sensor.TestVision_sensor import TestVisonSensor
+from controller.TestArm_controller import TestArmController
 
 from sensor.VisionROS_sensor import VisionROSensor
 from sensor.Realsense_sensor import RealsenseSensor
@@ -91,12 +91,21 @@ if __name__ == "__main__":
         data_buffer["left_arm"] = manager.list()
         data_buffer["right_arm"] = manager.list()
 
-        processes["vision_process_h"] = Process(target=ComponentWorker, args=(RealsenseSensor, "cam_head", ["342622301553"], ["color"], data_buffer, time_lock_vision_h, start_event, finish_event, "vision_worker_head"))
-        processes["vision_process_l"] = Process(target=ComponentWorker, args=(RealsenseSensor, "cam_left_wrist", ["242522071124"], ["color"], data_buffer, time_lock_vision_l, start_event, finish_event, "vision_worker_l"))
-        processes["vision_process_r"] = Process(target=ComponentWorker, args=(RealsenseSensor, "cam_right_wrist", ["244622071566"], ["color"], data_buffer, time_lock_vision_r, start_event, finish_event, "vision_worker_r"))
+        # processes["vision_process_h"] = Process(target=ComponentWorker, args=(RealsenseSensor, "cam_head", ["342622301553"], ["color"], data_buffer, time_lock_vision_h, start_event, finish_event, "vision_worker_head"))
+        # processes["vision_process_l"] = Process(target=ComponentWorker, args=(RealsenseSensor, "cam_left_wrist", ["242522071124"], ["color"], data_buffer, time_lock_vision_l, start_event, finish_event, "vision_worker_l"))
+        # processes["vision_process_r"] = Process(target=ComponentWorker, args=(RealsenseSensor, "cam_right_wrist", ["244622071566"], ["color"], data_buffer, time_lock_vision_r, start_event, finish_event, "vision_worker_r"))
 
-        processes["arm_process_l"] = Process(target=ComponentWorker, args=(PiperController, "left_arm", ["can_left"], ["joint", "qpos", "gripper"], data_buffer, time_lock_arm_l, start_event, finish_event, "arm_worker_l"))
-        processes["arm_process_r"] = Process(target=ComponentWorker, args=(PiperController, "right_arm", ["can_right"], ["joint", "qpos", "gripper"], data_buffer, time_lock_arm_r, start_event, finish_event, "arm_worker_r"))
+        processes["vision_process_h"] = Process(target=ComponentWorker, args=(TestVisonSensor, "cam_head", [], ["color"], data_buffer, time_lock_vision_h, start_event, finish_event, "vision_worker_head"))
+        processes["vision_process_l"] = Process(target=ComponentWorker, args=(TestVisonSensor, "cam_left_wrist", [], ["color"], data_buffer, time_lock_vision_l, start_event, finish_event, "vision_worker_l"))
+        processes["vision_process_r"] = Process(target=ComponentWorker, args=(TestVisonSensor, "cam_right_wrist", [], ["color"], data_buffer, time_lock_vision_r, start_event, finish_event, "vision_worker_r"))
+
+
+        # processes["arm_process_l"] = Process(target=ComponentWorker, args=(PiperController, "left_arm", ["can_left"], ["joint", "qpos", "gripper"], data_buffer, time_lock_arm_l, start_event, finish_event, "arm_worker_l"))
+        # processes["arm_process_r"] = Process(target=ComponentWorker, args=(PiperController, "right_arm", ["can_right"], ["joint", "qpos", "gripper"], data_buffer, time_lock_arm_r, start_event, finish_event, "arm_worker_r"))
+        
+        processes["arm_process_l"] = Process(target=ComponentWorker, args=(TestArmController, "left_arm", [], ["joint", "qpos", "gripper"], data_buffer, time_lock_arm_l, start_event, finish_event, "arm_worker_l"))
+        processes["arm_process_r"] = Process(target=ComponentWorker, args=(TestArmController, "right_arm", [], ["joint", "qpos", "gripper"], data_buffer, time_lock_arm_r, start_event, finish_event, "arm_worker_r"))
+        
         # time_scheduler = TimeScheduler(work_barrier=worker_barrier, time_freq=condition["save_freq"]) # 可以给多个进程同时上锁
         time_scheduler = TimeScheduler(work_events=all_events, time_freq=condition["save_freq"]) # 可以给多个进程同时上锁
         

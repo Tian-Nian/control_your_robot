@@ -67,21 +67,18 @@ class PiperDual(Robot):
             },
         }
 
-    def reset(self):
-        self.controllers["arm"]["left_arm"].reset(START_POSITION_ANGLE_LEFT_ARM)
-        self.controllers["arm"]["right_arm"].reset(START_POSITION_ANGLE_RIGHT_ARM)
-
     def set_up(self):
         self.controllers["arm"]["left_arm"].set_up("can_left")
         self.controllers["arm"]["right_arm"].set_up("can_right")
 
-        self.sensors["image"]["cam_head"].set_up(CAMERA_SERIALS['head'], is_depth=False)
-        self.sensors["image"]["cam_left_wrist"].set_up(CAMERA_SERIALS["left_wrist"], is_depth=False)
-        self.sensors["image"]["cam_right_wrist"].set_up(CAMERA_SERIALS["right_wrist"], is_depth=False)
+        # self.sensors["image"]["cam_head"].set_up(CAMERA_SERIALS['head'], is_depth=False)
+        # self.sensors["image"]["cam_left_wrist"].set_up(CAMERA_SERIALS["left_wrist"], is_depth=False)
+        # self.sensors["image"]["cam_right_wrist"].set_up(CAMERA_SERIALS["right_wrist"], is_depth=False)
 
         self.set_collect_type({"arm": ["joint","qpos","gripper"],
                                "image": ["color"],
                                })
+                               
         
         print("set up success!")
     
@@ -90,11 +87,11 @@ class PiperDual(Robot):
             "arm":{
                 "left_arm":{
                     "joint": np.array([0.0, 0.0, 0.0, 0.0 ,0.0, 0.0]),
-                    "gripper": 0.0 / 0.7,
+                    "gripper": 1.0 / 0.7,
                 },
                 "right_arm":{
                     "joint": np.array([0.0, 0.0, 0.0, 0.0 ,0.0, 0.0]),
-                    "gripper": 0.0 / 0.7,
+                    "gripper": 1.0 / 0.7,
                 }
             }
         }
@@ -119,24 +116,27 @@ if __name__ == "__main__":
     move_d = {
         "arm":{
             "left_arm":{
-                "joint": np.array([0.0, 0.0, 0.0, 0.0 ,0.0, 0.0])
+                "joint": np.array([0.0, 0.0, 0.0, 0.0 ,0.0, 0.0]),
+                "gripper": 0.0,
             },
             "right_arm":{
-                "joint": np.array([0.0, 0.0, 0.0, 0.0 ,0.0, 0.0])
+                "joint": np.array([0.0, 0.0, 0.0, 0.0 ,0.0, 0.0]),
+                "gripper": 1.0,
             }
         }
     }
     robot.move(move_d)
 
+    time.sleep(1)
     # data = robot.get()
     # print(data)
     # exit()
-    # replay_id = 10
-    # robot.show_pic(f"./save/Make_a_beef_sandwichv2/{replay_id}.hdf5", "cam_head")
+    replay_id = 10
+    # robot.show_pic(f"./save/Make_a_beef_sandwichv3/{replay_id}.hdf5", "cam_head")
     # robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_left_wrist")
     # robot.show_pic(f"./save/base/{replay_id}.hdf5", "cam_right_wrist")
     
-    robot.replay(f"./save/Make_a_beef_sandwichv3/0.hdf5", key_banned=["qpos"])
+    robot.replay(f"./save/Make_a_beef_sandwichv3/10.hdf5", key_banned=["qpos"])
     # robot.replay(f"./save/Make_a_beef_sandwich_dataset/{replay_id}.hdf5", key_banned=["qpos"]) #None
     
     exit()
@@ -150,7 +150,7 @@ if __name__ == "__main__":
         s = time.time()
         last_time = time.monotonic()
         now = time.monotonic()
-
+        
         while True:
             if is_enter_pressed():
                     break

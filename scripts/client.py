@@ -17,7 +17,7 @@ class Replay:
         self.ptr = 0
         self.episode = dict_to_list(hdf5_groups_to_dict(hdf5_path))
     def get_data(self):
-        print(self.episode[self.ptr].keys())
+        # print(self.episode[self.ptr].keys())
         data = self.episode[self.ptr], self.episode[self.ptr]
         self.ptr += 30
         return data
@@ -30,15 +30,19 @@ def input_transform(data):
         np.array(data[0]["left_arm"]["gripper"]).reshape(-1),
     ])
 
-    data[1]["cam_head"]["color"] = cv2.cvtColor(data[1]["cam_head"]["color"], cv2.COLOR_BGR2RGB)
-    data[1]["cam_left_wrist"]["color"] = cv2.cvtColor(data[1]["cam_left_wrist"]["color"], cv2.COLOR_BGR2RGB)
-    data[1]["cam_right_wrist"]["color"] = cv2.cvtColor(data[1]["cam_right_wrist"]["color"], cv2.COLOR_BGR2RGB)
+    # data[1]["cam_head"]["color"] = cv2.cvtColor(data[1]["cam_head"]["color"], cv2.COLOR_BGR2RGB)
+    # data[1]["cam_left_wrist"]["color"] = cv2.cvtColor(data[1]["cam_left_wrist"]["color"], cv2.COLOR_BGR2RGB)
+    # data[1]["cam_right_wrist"]["color"] = cv2.cvtColor(data[1]["cam_right_wrist"]["color"], cv2.COLOR_BGR2RGB)
     
-    cv2.imshow("cam_head", data[1]["cam_head"]["color"])
-    cv2.imshow("cam_left_wrist", data[1]["cam_left_wrist"]["color"])
-    cv2.imshow("cam_right_wrist", data[1]["cam_right_wrist"]["color"])
+    # cv2.imshow("cam_head", data[1]["cam_head"]["color"])
+    # # cv2.imshow("cam_left_wrist", data[1]["cam_left_wrist"]["color"])
+    # # cv2.imshow("cam_right_wrist", data[1]["cam_right_wrist"]["color"])
 
-    cv2.waitKey(1)
+    # cv2.waitKey(1)
+
+    # cv2.imshow("cam_head", data[1]["cam_head"]["color"])
+
+    # cv2.waitKey(1)
 
     img_arr = data[1]["cam_head"]["color"], data[1]["cam_right_wrist"]["color"], data[1]["cam_left_wrist"]["color"],
     return img_arr, state
@@ -73,9 +77,9 @@ class Client:
 
         for action in action_chunk[:30]:
             move_data = output_transform(action)
-            # if move_data["arm"]["left_arm"]["gripper"] < 0.5 :
+            # if move_data["arm"]["left_arm"]["gripper"] < 0.2 :
             #     move_data["arm"]["left_arm"]["gripper"] = 0.0
-            # if move_data["arm"]["right_arm"]["gripper"] < 0.5 :
+            # if move_data["arm"]["right_arm"]["gripper"] < 0.2 :
             #     move_data["arm"]["right_arm"]["gripper"] = 0.0
             
             self.robot.move(move_data)
@@ -87,9 +91,10 @@ class Client:
         else:    
             time.sleep(0.1)
             raw_data = self.robot.get()
-        print(raw_data)
+        # print(raw_data)
             
         img_arr, state = input_transform(raw_data)
+        print(state)
         data_send = {
             "img_arr": img_arr,
             "state": state
@@ -114,6 +119,10 @@ if __name__ == "__main__":
     robot = PiperDual()
     robot.set_up()
     robot.reset()
+    time.sleep(1)
+
+    robot.reset()
+    time.sleep(1)
 
     client = Client(robot)
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -121,7 +130,7 @@ if __name__ == "__main__":
 
     bisocket = BiSocket(client_socket, client.move)
     client.set_up(bisocket)
-    re = Replay("save/Make_a_beef_sandwichv2/10.hdf5")
+    re = Replay("save/Make_a_beef_sandwichv4/10.hdf5")
 
     while True:
         if is_enter_pressed():
@@ -140,6 +149,9 @@ if __name__ == "__main__":
             client.play_once(re)
             # client.play_once()
             print(f"play once:{i}")
+
+            time.sleep(1)
+            
 
             # time.sleep(3)
             while True:

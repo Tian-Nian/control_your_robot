@@ -112,6 +112,7 @@ class Robot:
         with open(config_path, 'r', encoding='utf-8') as f:
             condition = json.load(f)
         
+        # time_interval = 1.0 / 10
         time_interval = 1.0 / condition['save_freq']
 
         episode = dict_to_list(hdf5_groups_to_dict(data_path))

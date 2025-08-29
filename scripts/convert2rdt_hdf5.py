@@ -69,7 +69,7 @@ def convert(hdf5_paths, output_path, start_index=0):
             input_data = {}
 
             for key in map.keys():
-                input_data[key] = get_item(data, map[key])[::3]
+                input_data[key] = get_item(data, map[key])[:]
 
             qpos = np.array(input_data["qpos"]).astype(np.float32)
             
@@ -133,8 +133,8 @@ if __name__ == "__main__":
     # args = parser.parse_args()
     # data_path = args.data_path
     # output_path = args.outout_path
-    data_path = "save/Make_a_beef_sandwichv2/"
-    output_path = "/home/agilex/project/RoboTwin/policy/ACT/processed_data/real-Make_a_beef_sandwich-10fps/Make_a_beef_sandwich-50/"
+    data_path = "save/Make_a_beef_sandwichv4/"
+    output_path = "/home/agilex/project/RoboTwin/policy/ACT/processed_data/real-Make_a_beef_sandwich/Make_a_beef_sandwichv4/"
 
     # if output_path is None:
     #     data_config = json.load(os.path.join(data_path, "config.json"))

@@ -66,7 +66,7 @@ def ComponentWorker(component_class_name, component_name, component_setup_input,
             # try:
             data = component.get()
             # data_buffer.collect(component.name, data)
-            print(data.keys())
+            
             data_buffer[component.name].append(data)
 
             # except Exception as e:

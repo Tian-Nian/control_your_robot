@@ -168,8 +168,10 @@ if __name__ == "__main__":
     gripper_dim = args.gripper_dim
 
     if os.path.isdir(path):
-        paths = get_random_hdf5(path, 3)
+        paths = get_random_hdf5(path, 1)
     
+    print(paths)
+
     options = {
                 "qpos": {
                     "keys": ['x', 'y', 'z', 'rz', 'ry', 'rz'],
@@ -181,6 +183,7 @@ if __name__ == "__main__":
                     "keys": [f"gripper_{i}" for i in range(gripper_dim)],
                 }, 
             }
+    
     required_keys = []
     for key in options.keys():
         if key in my_options:
@@ -201,8 +204,8 @@ if __name__ == "__main__":
                     if len(keys) > 1:
                         data[keys[i]] = (episode["left_arm"][opt][:,i].flatten(), episode["right_arm"][opt][:,i].flatten())
                     else:
-                        data[keys[i]] = (episode["left_arm"][opt][:].flatten(), episode["right_arm"][opt][0].flatten())
-                        print(data[keys[i]])
+                        data[keys[i]] = (episode["left_arm"][opt][:].flatten(), episode["right_arm"][opt][:].flatten())
+                        # print(data[keys[i]])
                 else:
                     if len(keys) > 1:
                         data[keys[i]] = (episode["left_arm"][opt][:,i].flatten())

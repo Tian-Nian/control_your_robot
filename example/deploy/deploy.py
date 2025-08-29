@@ -90,6 +90,8 @@ if __name__ == "__main__":
     model, robot, episode_num, max_step = init()
     robot.set_up()
 
+    robot.reset()
+
     for i in range(episode_num):
         step = 0
         # 重置所有信息
@@ -114,7 +116,7 @@ if __name__ == "__main__":
             #         break
             #     else:
             #         time.sleep(0.01)
-            time.sleep(0.05)
+            # time.sleep(0.05)
             data = robot.get()
             img_arr, state = input_transform(data)
             model.update_observation_window(img_arr, state)
@@ -130,10 +132,10 @@ if __name__ == "__main__":
                 while True:
                     last = time.monotonic()
                     if last - now >= 1/robot.condition["save_freq"]:
-                        print(f"{last - now >= 1/robot.condition['save_freq']}s")
+                        print(f"{last - now}s")
                         break
                     else:
-                        time.sleep(0.001) 
+                        time.sleep(0.0001) 
 
                 if step >= max_step or is_enter_pressed():
                     debug_print("main", "enter pressed, the episode end", "INFO")

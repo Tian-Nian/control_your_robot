@@ -11,7 +11,7 @@ from utils.data_handler import is_enter_pressed,debug_print
 
 condition = {
     "save_path": "./save/", 
-    "task_name": "Make_a_beef_sandwichv3",  # Make_a_beef_sandwichv2
+    "task_name": "Make_a_beef_sandwichv5",  # Make_a_beef_sandwichv2
     "save_format": "hdf5", 
     "save_freq": 30,
 }
@@ -25,10 +25,11 @@ if __name__ == "__main__":
 
     robot = PiperDual(condition=condition, move_check=True)
     robot.set_up()
-    num_episode = 10
+    start_episode = 0
+    num_episode = 1
 
-    for _ in range(num_episode):
-        robot.reset()
+    for episode_id in range(start_episode, start_episode + num_episode):
+        # robot.reset()
         debug_print("main", "Press Enter to start...", "INFO")
         while not robot.is_start() or not is_enter_pressed():
             time.sleep(1/robot.condition["save_freq"])
@@ -45,7 +46,7 @@ if __name__ == "__main__":
             robot.collect(data)
             
             if is_enter_pressed():
-                robot.finish()
+                robot.finish(episode_id)
                 break
             
             while True:

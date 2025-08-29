@@ -148,7 +148,7 @@ class ACT:
 
             # Load policy weights
             # TODO
-            ckpt_path = os.path.join(ckpt_dir, "policy_last.ckpt")
+            ckpt_path = os.path.join(ckpt_dir, "policy_epoch_9500_seed_0.ckpt")
             
             print("current pwd:", os.getcwd())
             if os.path.exists(ckpt_path):
