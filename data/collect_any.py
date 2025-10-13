@@ -107,11 +107,6 @@ class CollectAny:
 
         data = np.array(data)
         return data
-        # if item in self.episode[0][controller_name]:
-        #     return np.array([self.episode[i][controller_name][item] for i in range(len(self.episode))])
-        # else:
-        #     debug_print("collect_any", f"item {item} not in {controller_name}", "ERROR")
-        #     return None
         
     def add_extra_condition_info(self, extra_info):
         save_path = os.path.join(self.condition["save_path"], f"{self.condition['task_name']}/")
@@ -157,11 +152,25 @@ class CollectAny:
         # print(f"WRITE called in PID={os.getpid()} TID={threading.get_ident()}")
         with h5py.File(hdf5_path, "w") as f:
             obs = f
-            for controller_name in self.episode[0].keys():
-                controller_group = obs.create_group(controller_name)
-                for item in self.episode[0][controller_name].keys():
-                    data = self.get_item(controller_name, item)
-                    controller_group.create_dataset(item, data=data)
+            mapping = {}
+
+            for ep in self.episode:
+                for outer_key, inner_dict in ep.items():
+                    if isinstance(inner_dict, dict):
+                        mapping[outer_key] = set(inner_dict.keys())
+            
+            for name, items in mapping.items():
+                print(name, ": ",items)
+                group = obs.create_group(name)
+                for item in items:
+                    data = self.get_item(name, item)
+                    group.create_dataset(item, data=data)
+                    
+            # for controller_name in name:
+            #     controller_group = obs.create_group(controller_name)
+            #     for item in self.episode[0][controller_name].keys():
+            #         data = self.get_item(controller_name, item)
+            #         controller_group.create_dataset(item, data=data)
         debug_print("collect_any", f"write to {hdf5_path}", "INFO")
         # reset the episode
         self.episode = []

@@ -40,7 +40,8 @@ class TimeScheduler:
         work_barrier: Optional[Barrier] = None,
         time_freq: int = 10,
         end_events: Optional[List[Event]] = None,
-        end_barrier: Optional[Barrier] = None
+        end_barrier: Optional[Barrier] = None,
+        process_name: str = None
     ):
 
         self.time_freq = int(time_freq)
@@ -66,7 +67,7 @@ class TimeScheduler:
             raise ValueError("end_events and end_barrier cannot both be set; choose one.")
 
         # 统计信息
-        self.process_name = "time_scheduler"
+        self.process_name = process_name
         self.real_time_accumulate_time_interval = Value('d', 0.0)
         self.step = Value('i', 0)
 

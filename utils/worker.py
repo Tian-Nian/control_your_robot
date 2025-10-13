@@ -62,6 +62,8 @@ class Worker:
         try:
             while not self.end_event.is_set():
                 self.forward_event.wait()  
+                start = time.monotonic()
+
                 if self.end_event.is_set():
                     break  # Prevent exiting immediately after acquire before processing data
 
@@ -79,6 +81,8 @@ class Worker:
                 else:
                     self.next_event.set()                
                 debug_print(self.process_name, "Data processed. Waiting for next time slot.", "DEBUG")
+                end = time.monotonic()
+                debug_print(self.process_name, f"running time: {end - start}s", "INFO")
 
             debug_print(self.process_name, "Finish event triggered. Finalizing...","INFO")
             self.finish()
