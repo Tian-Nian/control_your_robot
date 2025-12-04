@@ -1,5 +1,5 @@
 import sys
-sys.path.append("./")
+sys.path.append("src/")
 from utils.data_handler import hdf5_groups_to_dict
 import os
 import random

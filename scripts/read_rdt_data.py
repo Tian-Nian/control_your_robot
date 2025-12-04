@@ -1,5 +1,5 @@
 import sys
-sys.path.append("./")
+sys.path.append("src/")
 from utils.data_handler import debug_print
 
 import h5py

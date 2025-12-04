@@ -1,5 +1,6 @@
 import sys
-sys.path.append("./")
+sys.path.append("src/")
+
 import os
 from data.collect_any import CollectAny
 from data.generate_lerobot import MyLerobotDataset

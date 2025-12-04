@@ -1,5 +1,5 @@
 import sys
-sys.path.append("./")
+sys.path.append("src/")
 
 from my_robot.agilex_piper_dual import PiperDual
 

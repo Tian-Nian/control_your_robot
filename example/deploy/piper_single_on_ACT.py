@@ -1,6 +1,6 @@
 import sys
 
-sys.path.append("./")
+sys.path.append("src/")
 import os
 import numpy as np
 import torch

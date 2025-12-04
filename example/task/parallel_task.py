@@ -1,5 +1,5 @@
 import sys
-sys.path.append("./")
+sys.path.append("src/")
 
 from utils.task import YmlTask, Tasks, Success
 

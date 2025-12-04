@@ -1,5 +1,5 @@
 import sys
-sys.path.append("./")
+sys.path.append("src/")
 import time
 
 from multiprocessing import Process, Manager, Event, Semaphore, Barrier

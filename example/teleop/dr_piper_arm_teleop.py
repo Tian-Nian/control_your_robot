@@ -2,7 +2,7 @@ from re import S, T
 import sys
 
 from h5py._hl.dataset import sel
-sys.path.append("./")
+sys.path.append("src/")
 
 import time
 from multiprocessing import Manager, Event
