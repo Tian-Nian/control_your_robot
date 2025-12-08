@@ -1,7 +1,7 @@
 import numpy as np
 
 from sensor.teleoperation_sensor import TeleoperationSensor
-from utils.data_handler import matrix_to_xyz_rpy, compute_local_delta_pose, debug_print, euler_to_matrix, compute_rotate_matrix
+from utils.data_handler import debug_print, matrix_to_xyzrpy, xyzrpy_to_matrix, delta_pose
 
 from scipy.spatial.transform import Rotation as R
 from typing import Callable, Optional
@@ -24,7 +24,7 @@ def adjustment_matrix(transform):
         [0,0,0,1]
     ])
     
-    r_adj = euler_to_matrix(np.array([0,0,0,   -np.pi , 0, -np.pi/2]))
+    r_adj = xyzrpy_to_matrix(np.array([0,0,0,   -np.pi , 0, -np.pi/2]))
     
     transform = adj_mat @ transform  
     
@@ -49,15 +49,15 @@ class QuestSensor(TeleoperationSensor):
         if 'r' not in transformations:
             qpos = None
         
-        right_pose = matrix_to_xyz_rpy(adjustment_matrix(transformations['r']))
-        left_pose = matrix_to_xyz_rpy(adjustment_matrix(transformations['l']))
+        right_pose = matrix_to_xyzrpy(adjustment_matrix(transformations['r']))
+        left_pose = matrix_to_xyzrpy(adjustment_matrix(transformations['l']))
         
         qpos = [left_pose, right_pose]
         if self.prev_qpos is None:
             self.prev_qpos = qpos
             qpos = [np.array([0,0,0,0,0,0]), np.array([0,0,0,0,0,0])]
         else:
-            qpos[0], qpos[1] = compute_local_delta_pose(self.prev_qpos[0], qpos[0]), compute_local_delta_pose(self.prev_qpos[1], qpos[1])
+            qpos[0], qpos[1] = delta_pose(self.prev_qpos[0], qpos[0]), delta_pose(self.prev_qpos[1], qpos[1])
         
         qpos[0], qpos[1] = compute_rotate_matrix(qpos[0]), compute_rotate_matrix(qpos[1])
         qpos =  np.concatenate(qpos)

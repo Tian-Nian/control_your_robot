@@ -2,7 +2,7 @@ import numpy as np
 
 from sensor.teleoperation_sensor import TeleoperationSensor
 from utils.ros_subscriber import ROSSubscriber 
-from utils.data_handler import apply_local_offset_to_global_pose, compute_local_delta_pose, debug_print, compute_rotate_matrix
+from utils.data_handler import debug_print, delta_pose
 
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import JointState
@@ -53,7 +53,7 @@ class PikaRosSensor(TeleoperationSensor):
             self.prev_qpos = qpos
             qpos = np.array([0,0,0,0,0,0])
         else:
-            qpos = compute_local_delta_pose(self.prev_qpos, qpos)
+            qpos = delta_pose(self.prev_qpos, qpos)
         
         gripper_msg = self.sensor["gripper_subscriber"].get_latest_data()
         if gripper_msg is None:

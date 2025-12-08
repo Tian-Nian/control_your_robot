@@ -1,31 +1,39 @@
 import sys
 sys.path.append("src/")
 
-from utils.task import YmlTask, Tasks, Success
-
+from utils.task import YmlTask, Tasks, ShareSpace
+from my_robot.test_robot import TestRobot
 import numpy as np
 import os
 
+
 if __name__ == "__main__":
     # os.environ["INFO_LEVEL"] = "DEBUG" # DEBUG , INFO, ERROR
+    robot_1 = TestRobot()
+    robot_2 = TestRobot()
+
+    robot_1.set_up()
+    robot_2.set_up()
+
+    sp = ShareSpace()
 
     my_task = Tasks.build_top({
         "type": "Serial",
         "subtasks": [
             {"type": "Parallel",
              "subtasks": [
-                 YmlTask("./config/robot_1_move_mobile_1.yml", is_block=True),
-                 YmlTask("./config/robot_2_move_mobile_1.yml", is_block=True),
+                 YmlTask("./config/robot_1_move_mobile_1.yml", share_space=sp, robot=robot_1),
+                 YmlTask("./config/robot_2_move_mobile_1.yml", share_space=sp, robot=robot_2),
              ]},
             {"type": "Parallel",
              "subtasks": [
-                YmlTask("./config/robot_1_model_infer.yml", is_block=False),
-                YmlTask("./config/robot_2_model_infer.yml", is_block=False),
+                YmlTask("./config/robot_1_model_infer.yml", share_space=sp, robot=robot_1),
+                YmlTask("./config/robot_2_model_infer.yml", share_space=sp, robot=robot_2),
              ]},
              {"type": "Parallel",
              "subtasks": [
-                 YmlTask("./config/robot_1_move_mobile_2.yml", is_block=True),
-                 YmlTask("./config/robot_2_move_mobile_2.yml", is_block=True),
+                 YmlTask("./config/robot_1_move_mobile_2.yml", share_space=sp, robot=robot_1),
+                 YmlTask("./config/robot_2_move_mobile_2.yml", share_space=sp, robot=robot_2),
              ]},
         ],
     })

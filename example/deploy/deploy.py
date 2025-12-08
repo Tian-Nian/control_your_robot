@@ -1,5 +1,5 @@
 import sys
-sys.path.append('./')
+sys.path.append('src/')
 
 import os
 import importlib
@@ -90,7 +90,7 @@ def parse_args_and_config():
 
     # 分别读取两个配置文件
     robotwin_path = "config/RoboTwin_setting.yml"
-    base_model_path = f"policy/{args.base_model_name}/deploy_policy.yml"
+    base_model_path = f"src/policy/{args.base_model_name}/deploy_policy.yml"
 
     robotwin_setting = load_yaml_safe(robotwin_path)
     model_setting = load_yaml_safe(base_model_path)

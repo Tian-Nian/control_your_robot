@@ -1,4 +1,6 @@
 name: "robot_2_model_infer"
+info:
+  is_block: false
 robot:
   class:
     class_path: "my_robot.test_robot_2"

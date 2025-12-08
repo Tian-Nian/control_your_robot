@@ -1,11 +1,16 @@
 '''
 实现多个子任务连续执行
 '''
+import sys
+sys.path.append('./')
+
 import abc
 from typing import List, Optional, Any, Iterable, Union
 import os
 import yaml
 import importlib
+import threading
+
 
 from utils.data_handler import debug_print
 
@@ -137,6 +142,46 @@ def get_class(import_name, class_name):
         raise SystemExit(f"Unexpected error instantiating model: {e}")
     return return_class
 
+class ShareSpace:
+    """
+    一个线程安全的共享变量空间，用于在不同函数或模块间共享数据，
+    而无需使用全局变量或 return 传参。
+    """
+    def __init__(self):
+        self._space = {}
+        self._lock = threading.Lock()
+
+    def insert(self, key, value):
+        """插入或更新一个键值对"""
+        with self._lock:
+            self._space[key] = value
+
+    def get(self, key, default=None):
+        """安全地获取一个键的值"""
+        with self._lock:
+            return self._space.get(key, default)
+
+    def pop(self, key, default=None):
+        """取出一个键并删除"""
+        with self._lock:
+            return self._space.pop(key, default)
+
+    def clear(self):
+        """清空所有共享数据"""
+        with self._lock:
+            self._space.clear()
+
+    def keys(self):
+        """返回所有键（只读副本）"""
+        with self._lock:
+            return list(self._space.keys())
+
+    def __contains__(self, key):
+        """支持 `key in space` 判断"""
+        with self._lock:
+            return key in self._space
+
+    
 '''
 要给予yml文件配置任务, 需要拥有以下信息:
 name:
@@ -188,14 +233,13 @@ fail:
     True / False
 '''
 class YmlTask(BaseTask):
-    def __init__(self, yml_path: str, is_block=True):
-        self.is_block = is_block
+    def __init__(self, yml_path: str, share_space: ShareSpace, robot=None):
+        self.share_space = share_space
         self.running = False
         self.args = None
         self.success = False
 
-        self.robot = None
-        self.run_once = None
+        self.robot = robot
         self.extras = None
         self.extra_classes = None
 
@@ -205,6 +249,13 @@ class YmlTask(BaseTask):
         if self.args is None:
             raise ValueError(f"Invalid yml file: {yml_path}")
         
+        self.is_block = self.args["info"].get("is_block", False)
+
+        info_names = self.args["info"].keys()
+        self.infos = {}
+        for info_name in info_names:
+            self.infos[info_name] = self.args["info"].get(info_name)
+
         try:
             self.name = self.args["name"]
         except:
@@ -248,6 +299,7 @@ class YmlTask(BaseTask):
             else:
                 self.robot = self.robot_class()
             self.robot.set_up()
+        
         if self.extra_classes is not None and self.extras is None:
             self.extras = {}
             for extra_name, extra_class in self.extra_classes.items():
@@ -260,13 +312,13 @@ class YmlTask(BaseTask):
             if self.running:
                 return
             
-        if self.run_once is None:
-            if self.args["run"]["args"] is not None:
-                self.run_once = self.run_func(self, **self.args["run"]["args"])
-            else:
-                self.run_once = self.run_func(self)
+        if self.args["run"]["args"] is not None:
+            ret = self.run_func(self, **self.args["run"]["args"])
+        else:
+            ret = self.run_func(self)
 
         self.running = True
+        return ret
     
     def is_success(self):
         if self.success:
@@ -278,6 +330,7 @@ class YmlTask(BaseTask):
             else:
                 self.robot = self.robot_class()
             self.robot.set_up()
+        
         if self.extra_classes is not None and self.extras is None:
             self.extras = {}
             for extra_name, extra_class in self.extra_classes.items():
@@ -294,7 +347,7 @@ class YmlTask(BaseTask):
         if success:
             debug_print(self.name, "success!", "INFO")
             self.success = True
-            self.robot = None
+            # self.robot = None
             self.running = False
             if self.extras is not None:
                 if self.args["extras"]["release"]:
@@ -329,7 +382,7 @@ class YmlTask(BaseTask):
             if fail:
                 debug_print(self.name, "fail!", "INFO")
                 self.success = False
-                self.robot = None
+                # self.robot = None
                 self.running = False
                 if self.extras is not None:
                     if self.args["extras"]["release"]:

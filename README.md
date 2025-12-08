@@ -97,10 +97,8 @@ python example/collect/collect.py
 
 2. Model Deployment Tests
 ```bash
-# Run a straightforward deployment test
-python example/deploy/robot_on_test.py
 # General deployment script
-bash deploy.sh
+bash srcipts/deploy.sh
 # Offline data replay consistency test
 bash eval_offline.sh
 ```
