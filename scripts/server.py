@@ -19,9 +19,15 @@ class Server:
 
     def infer(self, message):
         debug_print("Server","Inference triggered.", "INFO")
-
         img_arr, state = message["img_arr"], message["state"]
-        self.model.update_observation_window(img_arr, state)
+
+        for data in img_arr:
+            jpeg_bytes = np.array(data).tobytes().rstrip(b"\0")
+            nparr = np.frombuffer(jpeg_bytes, dtype=np.uint8)
+            imgs_array.append(cv2.imdecode(nparr, 1))
+
+        self.model.update_observation_window(imgs_array, state)
+        
         action_chunk = self.model.get_action()
         return {"action_chunk": action_chunk}
 

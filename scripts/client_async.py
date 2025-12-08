@@ -10,6 +10,20 @@ import socket
 import time
 import numpy as np
 
+def images_encoding(imgs):
+    encode_data = []
+    padded_data = []
+    max_len = 0
+    for i in range(len(imgs)):
+        success, encoded_image = cv2.imencode('.jpg', imgs[i])
+        jpeg_data = encoded_image.tobytes()
+        encode_data.append(jpeg_data)
+        max_len = max(max_len, len(jpeg_data))
+    # padding
+    for i in range(len(imgs)):
+        padded_data.append(encode_data[i].ljust(max_len, b'\0'))
+    return encode_data, max_len
+
 def input_transform(data):
     state = np.concatenate([
         np.array(data[0]["left_arm"]["joint"]).reshape(-1),
@@ -19,7 +33,9 @@ def input_transform(data):
     ])
     
     img_arr = data[1]["cam_head"]["color"], data[1]["cam_right_wrist"]["color"], data[1]["cam_left_wrist"]["color"]
-    return img_arr, state
+    img_enc, img_enc_len = images_encoding(img_arr)
+
+    return img_enc, state
 
 def output_transform(data):
     move_data = {
@@ -76,14 +92,13 @@ class Client:
 
     def step(self):
         if len(self.action_queue) == 0:
-            return  # 空队列则等待下一帧
+            return
 
         action = self.action_queue.popleft()
 
         move_data = output_transform(action)
         self.robot.move(move_data)
 
-        # 在这里更新 last_action，保证跳变判断基于真实执行动作
         self.last_action = action
 
     def play_once(self):
@@ -125,7 +140,7 @@ if __name__ == "__main__":
         try:
             if is_enter_pressed():
                 exit()
-            client.play_once("test")
+            client.play_once()
             for i in range(20):
                 client.step()
                 time.sleep(1/30)
