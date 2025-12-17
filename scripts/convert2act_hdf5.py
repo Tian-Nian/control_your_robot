@@ -78,7 +78,7 @@ def convert(hdf5_paths, output_path, start_index=0):
             for i in range(len(qpos) - 1):
                 actions.append(qpos[i+1])
             
-            last_action = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+            last_action = last_action = np.zeros_like(actions[0])
             
             # 最后一帧结束无动作
             actions.append(last_action)
@@ -99,6 +99,22 @@ def convert(hdf5_paths, output_path, start_index=0):
 
             images = obs.create_group("images")
             
+            image_keys = ["cam_high", "cam_left_wrist", "cam_right_wrist"]
+            
+            for camera in image_keys:
+                uncompressed = input_data[camera].ndim == 4
+
+                if uncompressed:
+                    # load all images in RAM
+                    imgs_array = input_data[camera][:]
+                else:
+                    # load one compressed image after the other in RAM and uncompress
+                    imgs_array = []
+                    for data in input_data[camera]:
+                        imgs_array.append(cv2.cvtColor(cv2.imdecode(data, 1), cv2.COLOR_BGR2RGB))
+                    imgs_array = np.array(imgs_array)
+                
+                input_data[camera] = imgs_array
             # Retrieve data based on your camera/view names, then encode and compress it for storage.
 
             cam_high = input_data["cam_high"]

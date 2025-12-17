@@ -86,10 +86,21 @@ def convert(hdf5_paths, output_path, start_index=0):
             cam_left_wrist = get_item(data, map["cam_left_wrist"])
             cam_right_wrist = get_item(data, map["cam_right_wrist"])
             
-            head_enc, head_len = images_encoding(cam_high)
-            # wrist_enc, wrist_len = images_encoding(cam_wrist)
-            left_enc, left_len = images_encoding(cam_left_wrist)
-            right_enc, right_len = images_encoding(cam_right_wrist)
+            uncompressed = input_data[cam_high].ndim == 4
+            if uncompressed:
+                head_enc, head_len = images_encoding(cam_high)
+                # wrist_enc, wrist_len = images_encoding(cam_wrist)
+                left_enc, left_len = images_encoding(cam_left_wrist)
+                right_enc, right_len = images_encoding(cam_right_wrist)
+            else:
+                head_enc = cam_high
+                # wrist_enc = cam_wrist
+                left_enc = cam_left_wrist
+                right_enc = cam_right_wrist
+                head_len = cam_high.shape[1]
+                # wrist_len = cam_wrist.shape[1]
+                left_len = cam_left_wrist.shape[1]
+                right_len = cam_right_wrist.shape[1]
 
             images.create_dataset('cam_high', data=head_enc, dtype=f'S{head_len}')
             # images.create_dataset('cam_wrist', data=wrist_enc, dtype=f'S{wrist_len}')
