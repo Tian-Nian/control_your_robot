@@ -1,0 +1,27 @@
+[project]
+name = "control_your_robot"
+version = "1.0"
+description = "Physical Intelligence open source repo"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+dependencies = [
+    "scipy",
+    "numpy",
+    "h5py",
+    "pyrealsense2",
+    "opencv-python",
+    "keyboard",
+    "pyyaml",
+]
+
+
+[project.urls]
+Repository = "https://github.com/Tian-Nian/control_your_robot"
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.pytest.ini_options]
+markers = ["manual: should be run manually."]
+testpaths = ["src", "scripts"]

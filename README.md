@@ -69,8 +69,11 @@ This project aims to provide a comprehensive and ready-to-use pipeline for embod
 Since this project includes several test examples, such as robotic arm tests, visual simulation, and full robot simulation, it is possible to quickly understand the overall framework without requiring any physical hardware.  
 Because no hardware is needed, you can install the environment simply by running:
 
-```
+``` bash
  pip install -r requirements.txt
+ # or 
+GIT_LFS_SKIP_SMUDGE=1 uv sync
+GIT_LFS_SKIP_SMUDGE=1 uv pip install -e .
 ```  
 This project provides special debug levels: `"DEBUG"`, `"INFO"`, and `"ERROR"`. To fully observe the data flow, set it to `"DEBUG"`:
 ```bash
