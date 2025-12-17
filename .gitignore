@@ -27,3 +27,7 @@ piper_scripts/
 third_party/test.py
 policy/ACT/act_ckpt
 policy/ACT/detr/detr.egg-info
+
+planner/y1/
+
+policy/pi_rtc/
