@@ -101,13 +101,15 @@ class Robot:
             cv2.waitKey(10)
 
     def replay(self, data_path, key_banned=None, is_collect=False, episode_id=None):
-        parent_dir = os.path.dirname(data_path)
-        config_path = os.path.join(parent_dir, "config.json")
+        # parent_dir = os.path.dirname(data_path)
+        # config_path = os.path.join(parent_dir, "config.json")
         
-        with open(config_path, 'r', encoding='utf-8') as f:
-            condition = json.load(f)
+        # with open(config_path, 'r', encoding='utf-8') as f:
+        #     condition = json.load(f)
         
-        time_interval = 1.0 / condition['save_freq']
+        # time_interval = 1.0 / condition['save_freq']
+
+        time_interval = 1.0 / 20
 
         episode = dict_to_list(hdf5_groups_to_dict(data_path))
         

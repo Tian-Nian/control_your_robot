@@ -63,7 +63,7 @@ class TestModel:
         debug_print("model",f"update observation windows success", self.INFO)
         
     def get_action(self):
-        horizon = 3
+        horizon = 50
         assert (self.observation_window is not None), "update observation_window first!"
         if self.is_dual:
             action = np.concatenate([

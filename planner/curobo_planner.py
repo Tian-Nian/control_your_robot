@@ -74,7 +74,11 @@ class CuroboPlanner():
         self.motion_gen.warmup()
         self.motion_gen_batch = MotionGen(motion_gen_config)
         # self.motion_gen_batch.warmup(batch=10) # batch=CONFIGS.ROTATE_NUM = 10
-        
+    
+    def fk(self, joint):
+        joint = torch.tensor(joint, device="cuda",dtype=torch.float32)
+        result = self.ik_solver.fk(joint)
+        print(fk)
         
     def ik(self, target_gripper_pose, current_joint_angle=None):
         # 构造目标位姿，假设target_gripper_pose格式为[x,y,z, ..., qx,qy,qz,qw]
@@ -163,9 +167,10 @@ class CuroboPlanner():
         return result_p, result_q
 
 if __name__ == "__main__":
-    
-    planner = CuroboPlanner(active_joints_name=["fl_joint1","fl_joint2","fl_joint3","fl_joint4","fl_joint5","fl_joint6"], yml_path='/home/niantian/projects/aloha_maniskill_sim/curobo_left.yml')
+    planner = CuroboPlanner(active_joints_name=["joint1","joint2","joint3","joint4", "joint5","joint6"], yml_path='/home/xspark-ai/project/control_your_robot/planner/y1/curobo_left.yml')
     curr_joint_pos = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    planner.fk(curr_joint_pos)
+    exit()
     target_gripper_pose = np.array([0.0506, -0.0018,  0.3029, 0.7600,  0.4181, -0.4921,  0.0737])
     import time
     for i in range(10):

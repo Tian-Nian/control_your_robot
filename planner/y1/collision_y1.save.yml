@@ -1,0 +1,31 @@
+collision_spheres:
+  base_link:
+    - "center": [0.0, -0.00, 0.0]
+      "radius": 0.00001
+  link1:
+    - "center": [0.0, -0.00, 0.0]
+      "radius": 0.00001
+  link2:
+    - "center": [0.0, -0.00, 0.0]
+      "radius": 0.00001
+  link3:
+    - "center": [0.0, -0.00, 0.0]
+      "radius": 0.00001
+  link4:
+    - "center": [0.0, -0.00, 0.0]
+      "radius": 0.00001
+  link5:
+    - "center": [0.0, -0.00, 0.0]
+      "radius": 0.00001
+  link6:
+    - "center": [0.0, -0.00, 0.0]
+      "radius": 0.00001
+  gripper_base:
+    - "center": [0.0, -0.00, 0.0]
+      "radius": 0.00001
+  link7:
+    - "center": [0.0, -0.00, 0.0]
+      "radius": 0.00001
+  link8:
+    - "center": [0.0, -0.00, 0.0]
+      "radius": 0.00001

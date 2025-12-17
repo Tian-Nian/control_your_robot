@@ -12,7 +12,7 @@ from data.collect_any import CollectAny
 
 condition = {
     "save_path": "./save/", 
-    "task_name": "test_robot", 
+    "task_name": "uncap_error_corr_1117", 
     "save_format": "hdf5", 
     "save_freq": 10,
 }

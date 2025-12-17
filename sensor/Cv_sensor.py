@@ -51,7 +51,8 @@ class CvSensor(VisionSensor):
 
         if "color" in self.collect_info:
             # OpenCV 默认是 BGR，需要转成 RGB
-            image["color"] = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # image["color"] = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image["color"] = frame
 
         if "depth" in self.collect_info:
             if not self.is_depth:
@@ -78,11 +79,14 @@ class CvSensor(VisionSensor):
 
 if __name__ == "__main__":
     cam = CvSensor("test_cv")
-    cam.set_up(0)  # 默认摄像头
+    cam.set_up(18)  # 默认摄像头
     cam.set_collect_info(["color"])  # 只采集彩色
     cam_list = []
-    for i in range(100):
-        print(i)
+    # for i in range(100000):
+    while True:
+        # print(i)
         data = cam.get_image()
-        cam_list.append(data)
-        time.sleep(0.1)
+        # cam_list.append(data)
+        cv2.imshow("pic", data["color"])
+        cv2.waitKey(1)
+        # time.sleep(0.1)

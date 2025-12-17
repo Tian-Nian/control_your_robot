@@ -5,7 +5,7 @@ from sensor.vision_sensor import VisionSensor
 from copy import copy
 
 from utils.data_handler import debug_print
-
+import cv2
 
 def find_device_by_serial(devices, serial):
     """Find device index by serial number"""
@@ -57,27 +57,30 @@ class RealsenseSensor(VisionSensor):
             raise RuntimeError(f"Failed to initialize camera: {str(e)}")
 
     def get_image(self):
-        image = {}
-        frame = self.pipeline.wait_for_frames()
+        try:
+            image = {}
+            frame = self.pipeline.wait_for_frames()
 
-        if "color" in self.collect_info:
-            color_frame = frame.get_color_frame()
-            if not color_frame:
-                raise RuntimeError("Failed to get color frame.")
-            color_image = np.asanyarray(color_frame.get_data()).copy()
-            # BGR -> RGB
-            image["color"] = color_image[:,:,::-1]
+            if "color" in self.collect_info:
+                color_frame = frame.get_color_frame()
+                if not color_frame:
+                    raise RuntimeError("Failed to get color frame.")
+                color_image = np.asanyarray(color_frame.get_data()).copy()
+                # BGR -> RGB
+                image["color"] = color_image[:,:,::-1]
 
-        if "depth" in self.collect_info:
-            if not self.is_depth:
-                debug_print(self.name, f"should use set_up(is_depth=True) to enable collecting depth image","ERROR")
-                raise ValueError
-            else:       
-                depth_frame = frame.get_depth_frame()
-                if not depth_frame:
-                    raise RuntimeError("Failed to get depth frame.")
-                depth_image = np.asanyarray(depth_frame.get_data()).copy()
-                image["depth"] = depth_image
+            if "depth" in self.collect_info:
+                if not self.is_depth:
+                    debug_print(self.name, f"should use set_up(is_depth=True) to enable collecting depth image","ERROR")
+                    raise ValueError
+                else:       
+                    depth_frame = frame.get_depth_frame()
+                    if not depth_frame:
+                        raise RuntimeError("Failed to get depth frame.")
+                    depth_image = np.asanyarray(depth_frame.get_data()).copy()
+                    image["depth"] = depth_image
+        except:
+            raise RuntimeError(f"Error getting image:{self.name}")
         
         return image
 
@@ -93,11 +96,14 @@ class RealsenseSensor(VisionSensor):
 
 if __name__ == "__main__":
     cam = RealsenseSensor("test")
-    cam.set_up("419522071856")
-    cam.set_collect_info(["color"])
-    cam_list = []
-    for i in range(1000):
-        print(i)
+    cam.set_up("233722072561", is_depth=True)
+    cam.set_collect_info(["color", "depth"])
+
+    for i in range(100000):
         data = cam.get_image()
-        cam_list.append(data)
-        time.sleep(0.1)
+        depth_image = data["depth"]
+        rgb =data["color"]
+        depth_img = cv2.normalize(depth_image, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8UC1)
+        cv2.imshow("dep", depth_img)
+        cv2.imshow("color", rgb)
+        cv2.waitKey(33)

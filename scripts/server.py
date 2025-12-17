@@ -5,7 +5,7 @@ import socket
 import time
 
 from utils.bisocket import BiSocket
-from policy.test_policy.inference_model import TestModel
+from policy.openpi.inference_model import PI0_DUAL
 from utils.data_handler import debug_print
 
 class Server:
@@ -16,12 +16,13 @@ class Server:
     def set_up(self, bisocket: BiSocket):
         self.bisocket = bisocket
         self.model.reset_obsrvationwindows()
+        self.model.random_set_language()
 
     def infer(self, message):
         debug_print("Server","Inference triggered.", "INFO")
 
-        img_arr, state = message["img_arr"], message["state"]
-        self.model.update_observation_window(img_arr, state)
+        img_arr, state, instruction = message["img_arr"], message["state"], message["instruction"]
+        self.model.update_observation_window(img_arr, state, instruction)
         action_chunk = self.model.get_action()
         return {"action_chunk": action_chunk}
 
@@ -34,11 +35,13 @@ if __name__ == "__main__":
     import os
     os.environ["INFO_LEVEL"] = "DEBUG"
 
-    ip = "127.0.0.1"
-    port = 10000
+    ip = "0.0.0.0"
+    port = 10001
 
     DoFs = 6
-    model = TestModel("path/to/mmodel","test", DoFs=DoFs, is_dual=True)
+    # model = PI0_DUAL("path/to/mmodel","task_name")
+    model = PI0_DUAL("/home/xspark-ai/project/control_your_robot/policy/openpi/checkpoint/pi05_full_base/test/10000","test")
+    # model = PI0_DUAL("/home/xspark-ai/project/control_your_robot/policy/openpi/checkpoint/20000","test")
 
     server = Server(model)
 
