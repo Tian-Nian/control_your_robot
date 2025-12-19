@@ -9,6 +9,56 @@ import select
 
 from scipy.spatial.transform import Rotation
 
+def get_array_length(data: Dict[str, Any]) -> int:
+    """获取最外层np.array的长度"""
+    for value in data.values():
+        if isinstance(value, dict):
+            return get_array_length(value)
+        elif isinstance(value, np.ndarray):
+            return value.shape[0]
+    raise ValueError("No np.ndarray found in data.")
+
+def split_nested_dict(data: Dict[str, Any], idx: int) -> Dict[str, Any]:
+    """提取每一帧的子结构"""
+    result = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            result[key] = split_nested_dict(value, idx)
+        elif isinstance(value, np.ndarray):
+            result[key] = value[idx]
+        else:
+            raise TypeError(f"Unsupported type: {type(value)} at key {key}")
+    return result
+
+def dict_to_list(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    length = get_array_length(data)
+    return [split_nested_dict(data, i) for i in range(length)]
+
+class Replay:
+    def __init__(self, hdf5_path) -> None:
+        self.ptr = 0
+        self.episode = dict_to_list(hdf5_groups_to_dict(hdf5_path))
+    
+    def get_data(self, bias=1):
+        try:
+            data = self.episode[self.ptr], self.episode[self.ptr]
+            self.ptr += bias
+        except:
+            data = None
+            debug_print("Replay","Replay finish!", "INFO")
+        return data
+
+    def get_index_data(self, index):
+        try:
+            data = self.episode[index], self.episode[index]
+        except:
+            data = None
+            debug_print("Replay","Replay finish!", "INFO")
+        return data
+
+    def _index(self):
+        return self.ptr
+    
 def apply_local_offset_to_global_pose(T_offset, T_current):
     """
     在当前末端位姿 T_current(全局坐标)上，应用局部坐标下的变换 T_offset。

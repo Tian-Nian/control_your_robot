@@ -61,7 +61,11 @@ class ActionQueue:
         self.lock = Lock()
         self.last_index = 0
         self.cfg = cfg
+        self.move = False
 
+    def momve_gate(self, allow):
+        self.move = allow
+    
     def get(self) -> Tensor | None:
         """Get the next action from the queue.
 
@@ -75,6 +79,10 @@ class ActionQueue:
 
             action = self.queue[self.last_index]
             self.last_index += 1
+            
+            if not self.move:
+                return None
+        
             return action.clone()
 
     def qsize(self) -> int:

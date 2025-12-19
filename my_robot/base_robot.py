@@ -13,7 +13,7 @@ from sensor.TestVision_sensor import TestVisonSensor
 
 from data.collect_any import CollectAny
 
-from utils.data_handler import debug_print, hdf5_groups_to_dict
+from utils.data_handler import debug_print, hdf5_groups_to_dict, dict_to_list
 
 import cv2
 
@@ -50,7 +50,7 @@ class Robot:
                 for sensor in self.sensors[key].values():
                     sensor.set_collect_info(value)
     
-    def get(self):
+    def get(self, **kargs):
         controller_data = {}
         sensor_data = {}
 
@@ -111,7 +111,7 @@ class Robot:
 
         time_interval = 1.0 / 20
 
-        episode = dict_to_list(hdf5_groups_to_dict(data_path))
+        episode = (hdf5_groups_to_dict(data_path))
         
         now_time = last_time = time.monotonic()
         for ep in episode:
@@ -127,7 +127,7 @@ class Robot:
         if is_collect:
             self.finish(episode_id)
     
-    def play_once(self, episode: Dict[str, Any], key_banned=None):
+    def play_once(self, dict_to_listepisode: Dict[str, Any], key_banned=None):
         for controller_type, controller_group in self.controllers.items():
             for controller_name, controller in controller_group.items():
                 if controller_name in episode:
@@ -137,31 +137,6 @@ class Robot:
                         },
                     }
                     self.move(move_data, key_banned=key_banned)
-
-def get_array_length(data: Dict[str, Any]) -> int:
-    """获取最外层np.array的长度"""
-    for value in data.values():
-        if isinstance(value, dict):
-            return get_array_length(value)
-        elif isinstance(value, np.ndarray):
-            return value.shape[0]
-    raise ValueError("No np.ndarray found in data.")
-
-def split_nested_dict(data: Dict[str, Any], idx: int) -> Dict[str, Any]:
-    """提取每一帧的子结构"""
-    result = {}
-    for key, value in data.items():
-        if isinstance(value, dict):
-            result[key] = split_nested_dict(value, idx)
-        elif isinstance(value, np.ndarray):
-            result[key] = value[idx]
-        else:
-            raise TypeError(f"Unsupported type: {type(value)} at key {key}")
-    return result
-
-def dict_to_list(data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    length = get_array_length(data)
-    return [split_nested_dict(data, i) for i in range(length)]
 
 # def remove_duplicate_keys(source_dict: dict[str, any], keys_to_remove: list[str]) -> dict[str, any]:
 def remove_duplicate_keys(source_dict, keys_to_remove):

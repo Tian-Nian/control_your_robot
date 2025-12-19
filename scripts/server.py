@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     DoFs = 6
     # model = PI0_DUAL("path/to/mmodel","task_name")
-    model = PI0_DUAL("/home/xspark-ai/project/control_your_robot/policy/openpi/checkpoint/pi05_full_base/test/10000","test")
+    model = PI0_DUAL("/home/xspark-ai/project/control_your_robot/policy/openpi/checkpoint/airpods","dec18")
     # model = PI0_DUAL("/home/xspark-ai/project/control_your_robot/policy/openpi/checkpoint/20000","test")
 
     server = Server(model)

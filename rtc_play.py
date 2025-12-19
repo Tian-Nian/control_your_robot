@@ -11,6 +11,7 @@ from utils.worker import Worker
 # from policy.test_policy.inference_model import TestModel
 from policy.pi_rtc.inference_model import PI0_DUAL
 from my_robot.test_robot import TestRobot
+from my_robot.y1_dual_base import Y1Dual
 from utils.action_queue import ActionQueue
 from utils.latency_tracker import LatencyTracker
 from utils.time_scheduler import TimeScheduler
@@ -38,6 +39,12 @@ def input_transform(data, size=256):
     return img_arr, state
 
 def output_transform(data):
+    if data[6]< 0.1:
+        data[6] = 0.0
+    
+    if data[13]< 0.1:
+        data[13] = 0.0
+    
     move_data = {
         "arm":{
             "left_arm":{
@@ -58,21 +65,21 @@ class RTCDemoConfig:
     # RTC configuration
     rtc: RTCConfig = field(
         default_factory=lambda: RTCConfig(
-            execution_horizon=10,
-            max_guidance_weight=1.0,
+            execution_horizon=5,
+            max_guidance_weight=10.0,
             prefix_attention_schedule=RTCAttentionSchedule.EXP,
         )
     )
 
     # Demo parameters
-    fps: float = 10.0  # Action execution frequency (Hz)
+    fps: float = 30.  # Action execution frequency (Hz)
 
     # Compute device
     device: str | None = "cuda"  # Device to run on (cuda, cpu, auto)
 
     # Get new actions horizon. The amount of executed steps after which will be requested new actions.
     # It should be higher than inference delay + execution horizon.
-    action_queue_size_to_get_new_actions: int = 25
+    action_queue_size_to_get_new_actions: int = 10
 
 class Number:
     def __init__(self):
@@ -113,22 +120,24 @@ class InferWorker(Worker):
         self.cfg = cfg
         self.lock = Lock()
         self.number = number
+        self.run = False
 
     def component_init(self):
-        # self.policy = PI0_DUAL("/home/xspark-ai/project/control_your_robot/policy/openpi/checkpoint/pi05/pytorch/30000/", "test")
         self.latency_tracker = LatencyTracker()
         self.infering = False
+        self.allow_move = 0
     
     def handler(self):
         get_actions_threshold =  self.cfg.action_queue_size_to_get_new_actions
         fps = self.cfg.fps
         time_per_chunk = 1.0 / fps
+        # NOT RTC
+        # get_actions_threshold = 0
 
-        if self.action_queue.qsize() <= get_actions_threshold and not self.infering:
+        print(f"TRIGGER: {self.action_queue.qsize()} / {get_actions_threshold}")
+        if self.action_queue.qsize() <= get_actions_threshold: # and not self.infering:
             now = time.monotonic()
             print("start infering!")
-            with self.lock:
-                self.infering = True
             
             current_time = time.perf_counter()
             action_index_before_inference = self.action_queue.get_action_index()
@@ -140,13 +149,21 @@ class InferWorker(Worker):
             inference_latency = self.latency_tracker.max()
             inference_delay = math.ceil(inference_latency / time_per_chunk)
 
-            data = self.robot.get()
+            data = self.robot.get(self.run)
+            # data = self.robot.get()
+
+            if data is None:
+                return
+            
             img_arr, state = input_transform(data)
             self.policy.update_observation_window(img_arr, state)
 
             action_chunk = self.policy.get_action(inference_delay=inference_delay, 
                                                     prev_chunk_left_over=prev_actions, 
                                                     execution_horizon= self.cfg.rtc.execution_horizon)
+            
+            # NOT RTC
+            # action_chunk = self.policy.get_action()
 
             original_actions = torch.tensor(action_chunk).to("cpu")
             postprocessed_actions = torch.tensor(action_chunk).to("cpu")
@@ -159,53 +176,55 @@ class InferWorker(Worker):
                 print(
                     "[GET_ACTIONS] cfg.action_queue_size_to_get_new_actions Too small, It should be higher than inference delay + execution horizon."
                 )
+            
+            # make sure inference is already arm up. 
+            time_cost = time.monotonic() - now
+            if time_cost < 1.0:
+                self.allow_move += 1
+                if self.allow_move == 2:
+                    # 回到零位做安全保护
+                    action_chunk = np.tile(
+                        np.array([0., 0., 0., 0., 0., 0., 1.0, 0., 0., 0., 0., 0., 0., 1.0]),
+                        (50, 1)
+                    )
+
+                    original_actions = torch.tensor(action_chunk).to("cpu")
+                    postprocessed_actions = torch.tensor(action_chunk).to("cpu")
+
+                if self.allow_move > 2:
+                    self.action_queue.momve_gate(self.run)
+                    self.run = True
+            else:
+                self.run = False
+                self.action_queue.momve_gate(self.run)
+                self.allow_move = max(0, self.allow_move -1)
+            
             self.action_queue.merge(
                 original_actions, postprocessed_actions, new_delay, action_index_before_inference
             )
-            print("infer success!")
+            print(f"Infer success! Time cost:{time_cost}")
             self.number.clear()
-            with self.lock:
-                self.infering = False
 
-            print("time cost:", time.monotonic() - now)
-        else:
-            time.sleep(0.1)
-        
-
-def warm_up(policy, infer_time_sost):
-    robot = TestRobot()
-    robot.set_up()
-    while True:
-        now = time.monotonic()
-        img_arr, state = input_transform(robot.get())
-        self.policy.update_observation_window(img_arr, state)
-
-        now = time.monotonic()
-        action_chunk = self.policy.get_action(inference_delay=inference_delay, 
-                                                prev_chunk_left_over=prev_actions, 
-                                                execution_horizon= self.cfg.rtc.execution_horizon)
-        time_cost = time.monotonic() - now
-        print(f"TESTING TIME COST: {time_cost}")
-        if time_cost < infer_time_sost:
-            break
-    return
 def main_cli():
     cfg = RTCDemoConfig()
 
     start_event, end_event = Event(), Event()
-    robot = TestRobot()
+    # robot = Y1Dual()# TestRobot()
+    robot = TestRobot(replay_path="save/complete_traj_1117/20.hdf5")
     robot.set_up()
+    robot.reset()
 
     action_queue = ActionQueue(cfg.rtc)
 
     number = Number()
     robot_worker = RobotWorker("robot", start_event, end_event, robot, action_queue, number)
 
-    policy = PI0_DUAL("/home/xspark-ai/project/control_your_robot/policy/openpi/checkpoint/pi05/pytorch/30000/", "test")
-    warm_up(policy, 1.5)
+    policy = PI0_DUAL("/home/xspark-ai/project/control_your_robot/policy/openpi/checkpoint/pi05/pytorch/rtc_pi05/", "test", rtc=True)
+    # policy = None
+    # warm_up(policy, 1.5)
     infer_worker = InferWorker("infer", start_event, end_event, robot, policy, cfg, action_queue, number)
 
-    time_scheduler_robot = TimeScheduler(work_events=[robot_worker.forward_event], time_freq=10, end_events=[robot_worker.next_event], process_name="time_scheduler_robot")
+    time_scheduler_robot = TimeScheduler(work_events=[robot_worker.forward_event], time_freq=30, end_events=[robot_worker.next_event], process_name="time_scheduler_robot")
     time_scheduler_infer = TimeScheduler(work_events=[infer_worker.forward_event], time_freq=10, end_events=[infer_worker.next_event], process_name="time_scheduler_infer")
 
     robot_worker.start()
@@ -226,8 +245,11 @@ def main_cli():
     
     while is_start:
         time.sleep(0.01)
-        if is_enter_pressed():
+        if is_enter_pressed():            
             end_event.set()  
+            time.sleep(2)
+            robot.draw()
+
             time_scheduler_robot.stop()  
             time_scheduler_infer.stop()  
             is_start = False

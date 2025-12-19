@@ -150,6 +150,9 @@ def end_pose_transform(tarjectory_base_pose, tarjectory_pose, robot_base_pose):
     # Convert back to pose
     return matrix_to_pose(T_robot)
 
+def fraw(self):
+    return
+
 def test_delta_eef():
     from utils.data_handler import debug_print, hdf5_groups_to_dict
     hdf5_path = "save/pick_bag_1118/_zip/10.hdf5"

@@ -87,11 +87,6 @@ class Worker:
         debug_print(self.process_name, "Finish event triggered. Finalizing...","INFO")
         self.finish()
 
-        # except KeyboardInterrupt:
-            # debug_print(self.process_name, "Worker terminated by user.", "WARNING")
-        
-        # finally:
-            # self.finish()
         self.next_event.set()
         debug_print(self.process_name, "Worker exiting.", "INFO")
 
