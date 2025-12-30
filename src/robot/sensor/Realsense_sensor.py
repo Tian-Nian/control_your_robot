@@ -15,13 +15,12 @@ def find_device_by_serial(devices, serial):
     return None
 
 class RealsenseSensor(VisionSensor):
-    def __init__(self, name):
-        super().__init__()
+    def __init__(self, name, encode_rgb=False):
+        super().__init__(encode_rgb=encode_rgb)
         self.name = name
     
-    def set_up(self,CAMERA_SERIAL,is_depth = False, encode_rgb=False):
+    def set_up(self,CAMERA_SERIAL,is_depth = False):
         self.is_depth = is_depth
-        self.encode_rgb = encode_rgb
         try:
             # Initialize RealSense context and check for connected devices
             self.context = rs.context()
