@@ -6,7 +6,7 @@ from robot.sensor.Realsense_sensor import RealsenseSensor
 # from robot.sensor.Vitac3D import Vitac3D
 from robot.data.collect_any import CollectAny
 from robot.controller.drAloha_controller import DrAlohaController
-from my_robot.base_robot import Robot
+from robot.robot.base_robot import Robot
 from typing import Dict, Any
 import math
 import time

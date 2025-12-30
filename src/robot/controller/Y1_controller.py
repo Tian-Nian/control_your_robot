@@ -3,7 +3,7 @@ sys.path.append("./")
 
 from robot.controller.arm_controller import ArmController
 from robot.utils.base.data_handler import debug_print, is_enter_pressed
-from my_robot.base_robot import dict_to_list
+from robot.robot.base_robot import dict_to_list
 
 from y1_sdk import Y1SDKInterface, ControlMode
 import numpy as np

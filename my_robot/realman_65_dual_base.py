@@ -1,7 +1,7 @@
 import sys
 sys.path.append("./")
 
-from my_robot.base_robot import Robot
+from robot.robot.base_robot import Robot
 
 from robot.controller.Realman_controller import RealmanController
 from robot.sensor.Realsense_sensor import RealsenseSensor

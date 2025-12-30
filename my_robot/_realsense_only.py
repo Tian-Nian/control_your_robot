@@ -3,7 +3,7 @@ sys.path.append("./")
 
 import numpy as np
 
-from my_robot.base_robot import Robot
+from robot.robot.base_robot import Robot
 
 from robot.controller.Piper_controller import PiperController
 from robot.sensor.Realsense_sensor import RealsenseSensor

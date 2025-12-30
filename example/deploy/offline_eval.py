@@ -13,7 +13,7 @@ import seaborn as sns
 from matplotlib.lines import Line2D
 
 from robot.utils.base.data_handler import debug_print, is_enter_pressed, hdf5_groups_to_dict
-from my_robot.base_robot import dict_to_list
+from robot.robot.base_robot import dict_to_list
 
 ### =========THE PLACE YOU COULD MODIFY=========
 # eval setting
