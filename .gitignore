@@ -29,3 +29,5 @@ policy/ACT/detr/detr.egg-info
 controller/URUrx_controller.py
 processed_data/*
 test/*
+policy/openpi/checkpoints/*
+policy/DP/checkpoints/*
