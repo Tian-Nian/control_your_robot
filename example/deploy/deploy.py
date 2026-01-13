@@ -154,22 +154,28 @@ class RoboTwinModel:
         self.observation_window["observation"]["right_camera"] = {"rgb": img_arr[1]}
         self.observation_window["observation"]["left_camera"] = {"rgb": img_arr[2]}
         self.observation_window["agent_pos"] = state
-        self.observation_window["joint_action"] = {"vector": state}
+        self.observation_window["joint_action"] = {"vector": state,
+                                                   "left_arm": state[:6],
+                                                   "left_gripper": state[6],
+                                                   "right_arm": state[7:13],
+                                                   "right_gripper": state[13]}
     
     def get_action(self):
         if self.model.observation_window is None:
-            instruction = self.TASK_ENV.get_instruction()
-            self.model.set_language(instruction)
+            try:
+                instruction = self.TASK_ENV.get_instruction()
+                self.model.set_language(instruction)
+            except:
+                debug_print("Not VLA model, wouldn't set language instruction.", "INFO")
 
-        input_rgb_arr, input_state = self.encode_obs(self.observation_window)
-        self.model.update_observation_window(input_rgb_arr, input_state)
+        obs = self.encode_obs(self.observation_window)
 
         # ======== Get Action ========
-        actions = self.model.get_action()[:]
+        actions = self.model.get_action(obs)[:]
         return actions
     
     def reset_obsrvationwindows(self):
-        self.model.reset_obsrvationwindows()
+        self.model.reset_model()
 
 def init():
     args = parse_args_and_config()
