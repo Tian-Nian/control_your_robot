@@ -14,6 +14,7 @@ from robot.utils.base.data_handler import debug_print, is_enter_pressed
 # START ================ you could modify to your format ================ 
 video_path="save/videos/"
 fps = 30
+import cv2
 
 def input_transform(data):
     state = np.concatenate([
@@ -24,7 +25,12 @@ def input_transform(data):
     ])
 
     img_arr = data[1]["cam_head"]["color"], data[1]["cam_right_wrist"]["color"], data[1]["cam_left_wrist"]["color"]
-    return img_arr, state
+    ret_arr = []
+    for img in img_arr:
+        img_resize = cv2.resize(img, (640, 480))
+        ret_arr.append(img_resize)
+
+    return ret_arr, state
 
 def output_transform(data):
     move_data = {
@@ -90,7 +96,7 @@ def parse_args_and_config():
 
     # 分别读取两个配置文件
     robotwin_path = "config/RoboTwin_setting.yml"
-    base_model_path = f"policy/{args.base_model_name}/deploy_policy.yml"
+    base_model_path = f"src/robot/policy/{args.base_model_name}/deploy_policy.yml"
 
     robotwin_setting = load_yaml_safe(robotwin_path)
     model_setting = load_yaml_safe(base_model_path)
@@ -154,35 +160,33 @@ class RoboTwinModel:
         self.observation_window["observation"]["right_camera"] = {"rgb": img_arr[1]}
         self.observation_window["observation"]["left_camera"] = {"rgb": img_arr[2]}
         self.observation_window["agent_pos"] = state
-        self.observation_window["joint_action"] = {"vector": state,
-                                                   "left_arm": state[:6],
+        self.observation_window["joint_action"] = {"left_arm": state[:6],
                                                    "left_gripper": state[6],
                                                    "right_arm": state[7:13],
                                                    "right_gripper": state[13]}
     
     def get_action(self):
-        if self.model.observation_window is None:
-            try:
-                instruction = self.TASK_ENV.get_instruction()
-                self.model.set_language(instruction)
-            except:
-                debug_print("Not VLA model, wouldn't set language instruction.", "INFO")
+        # if self.model.observation_window is None:
+        #     instruction = self.TASK_ENV.get_instruction()
+        #     self.model.set_language(instruction)
 
+        # input_rgb_arr, input_state = self.encode_obs(self.observation_window)
         obs = self.encode_obs(self.observation_window)
-
         # ======== Get Action ========
         actions = self.model.get_action(obs)[:]
+
         return actions
     
     def reset_obsrvationwindows(self):
-        self.model.reset_model()
-
+        # self.model.reset_obsrvationwindows()
+        return
+    
 def init():
     args = parse_args_and_config()
 
     is_robotwin = args["robotwin"]
     is_video = args["video"]
-
+    
     if not is_robotwin:
         base_model_class = get_class(f"robot.policy.{args['base_model_name']}.inference_model", args["base_model_class"])
         model = base_model_class(args["base_model_path"], args["base_task_name"])
@@ -248,7 +252,7 @@ if __name__ == "__main__":
                 robot.move(move_data)
                 step += 1
                 # time.sleep(1/robot.condition["save_freq"])
-                time.sleep(1 / 20)
+                time.sleep(1 / 10)
                 if step >= max_step or is_enter_pressed():
                     debug_print("main", "enter pressed, the episode end", "INFO")
                     is_start = False
