@@ -10,9 +10,8 @@ import shutil
 from typing import Literal
 
 import h5py
-from lerobot.common.datasets.lerobot_dataset import LEROBOT_HOME
+from lerobot.common.datasets.lerobot_dataset import HF_LEROBOT_HOME
 from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
-from lerobot.common.datasets.push_dataset_to_hub._download_raw import download_raw
 import numpy as np
 import torch
 import tqdm
@@ -156,13 +155,9 @@ def port_aloha(
     mode: Literal["video", "image"] = "image",
     dataset_config: DatasetConfig = DEFAULT_DATASET_CONFIG,
 ):
-    if (LEROBOT_HOME / repo_id).exists():
-        shutil.rmtree(LEROBOT_HOME / repo_id)
+    if (HF_LEROBOT_HOME / repo_id).exists():
+        shutil.rmtree(HF_LEROBOT_HOME / repo_id)
 
-    if not raw_dir.exists():
-        if raw_repo_id is None:
-            raise ValueError("raw_repo_id must be provided if raw_dir does not exist")
-        download_raw(raw_dir, repo_id=raw_repo_id)
     hdf5_files = []
     for root, _, files in os.walk(raw_dir):
             for filename in fnmatch.filter(files, '*.hdf5'):
@@ -203,13 +198,13 @@ def port_aloha(
             },
             "observation.state": {
                 "dtype": "float32",
-                "shape": (16,),
-                "names": ["r1,r2,r3,r4,r5,r6,r7,gr,l1,l2,l3,l4,l5,l6,l7,gl"],
+                "shape": (14,),
+                "names": ["r1,r2,r3,r4,r5,r6,gr,l1,l2,l3,l4,l5,l6,gl"],
             },
             "action": {
                 "dtype": "float32",
-                "shape": (16,),
-                "names": ["r1,r2,r3,r4,r5,r6,r7,gr,l1,l2,l3,l4,l5,l6,l7,gl"],
+                "shape": (14,),
+                "names": ["r1,r2,r3,r4,r5,r6,gr,l1,l2,l3,l4,l5,l6,gl"],
             },
         },
         image_writer_threads=10,
@@ -221,10 +216,6 @@ def port_aloha(
         task=task,
         episodes=episodes,
     )
-    dataset.consolidate()
-
-    if push_to_hub:
-        dataset.push_to_hub()
 
 
 if __name__ == "__main__":

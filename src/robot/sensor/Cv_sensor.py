@@ -6,7 +6,7 @@ from robot.utils.base.data_handler import debug_print
 
 
 class CvSensor(VisionSensor):
-    def __init__(self, name):
+    def __init__(self, name, encode_rgb=False):
         super().__init__(encode_rgb=encode_rgb)
         self.name = name
         self.cap = None

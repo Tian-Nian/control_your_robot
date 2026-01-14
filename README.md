@@ -10,7 +10,7 @@
 </p>
 if the wechat group overdue, you could add my wechat to join in.
 
-# (untested on real robot) Data collect pipeline now can choose to save the data into the format you want!
+# Data collect pipeline now can choose to save the data into the format you want!
 You can try it by switch to the branch--`newest` to have a try.  
 A function added at `CollectAny` called `_add_data_transform_pipeline()`, add we provide two choice under `utils/data_transofrm_pipeline.py`:
 1. `image_rgb_encode_pipeline`  

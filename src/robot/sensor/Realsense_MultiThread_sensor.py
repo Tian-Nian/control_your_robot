@@ -16,8 +16,8 @@ def find_device_by_serial(devices, serial):
     return None
 
 class RealsenseSensor(VisionSensor):
-    def __init__(self, name):
-        super().__init__()
+    def __init__(self, name, encode_rgb=False):
+        super().__init__(encode_rgb=encode_rgb)
         self.name = name
         # 添加线程控制变量
         self.frame_buffer = deque(maxlen=1)  # 仅保留最新帧
