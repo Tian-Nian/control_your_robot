@@ -58,6 +58,7 @@ python example/deploy/deploy.py \
     --seed ${seed} \
     --policy_name ${policy_name} 
 ```
+
 By `RoboTwin` pipeline, some of the `base_` index may not make effect, here use None instead. Also some of the RoboTwin setting not take effect, you could ignore it.
 
 Other deploy info you could refer to RoboTwin Document, like some of the model should modify `deploy_policy.yml`.
@@ -136,6 +137,11 @@ python -m my_robot.test_robot
 ```bash
 # After running python example/collect/collect.py and obtaining trajectories
 python scripts/convert2rdt_hdf5.py save/test_robot/ save/rdt/
+
+# TO openpi dataset(lerobot2.1)
+python scripts/convert2act_hdf5.py save/test_robot/ save/openpi_hdf5/
+# you should copy an instruction from task_instructions/ to save/openpi_hdf5/
+python scripts/convert2openpi.py --raw_dir save/openpi_hdf5/ --repo_id my_repo_id
 ```
 
 7. upload data

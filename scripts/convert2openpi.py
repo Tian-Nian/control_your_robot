@@ -127,6 +127,7 @@ def populate_dataset(
             frame = {
                 "observation.state": state[i],
                 "action": action[i],
+                "task": instruction,
             }
 
             for camera, img_array in imgs_per_cam.items():
@@ -139,7 +140,7 @@ def populate_dataset(
                 # if "cam_right_wrist" not in frame.keys():
                     # frame["observation.images.cam_right_wrist"] = np.zeros_like(img_array[0])
             dataset.add_frame(frame)
-        dataset.save_episode(task=instruction)
+        dataset.save_episode()
     return dataset
 
 
