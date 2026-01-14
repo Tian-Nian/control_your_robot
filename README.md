@@ -10,6 +10,11 @@
 </p>
 if the wechat group overdue, you could add my wechat to join in.
 
+# visualize data by rerun!
+refer to `scripts/visual_hdf5_rerun.sh` to visual your data, support type:
+1. control_your_robot raw data
+2. act / rdt hdf5 data
+
 # Data collect pipeline now can choose to save the data into the format you want!
 You can try it by switch to the branch--`newest` to have a try.  
 A function added at `CollectAny` called `_add_data_transform_pipeline()`, add we provide two choice under `utils/data_transofrm_pipeline.py`:
