@@ -144,29 +144,24 @@ def get_item(Dict_data: Dict, item):
 
 def hdf5_groups_to_dict(hdf5_path):
     """
-    读取HDF5文件中所有group，并转换为嵌套字典结构
-    
-    参数:
-        hdf5_path: HDF5文件路径
-        
-    返回:
-        包含所有group数据的嵌套字典
+    读取 HDF5 文件，返回真正的嵌套 dict
+    - dict.keys() 只包含第一层
+    - 子 group / dataset 保持原始层级
     """
-    result = {}
-    
-    with h5py.File(hdf5_path, 'r') as f:
-        # 遍历文件中的所有对象
-        def visit_handler(name, obj):
-            if isinstance(obj, h5py.Group):
-                group_dict = {}
-                # 遍历group中的所有数据集
-                for key in obj.keys():
-                    if isinstance(obj[key], h5py.Dataset):
-                        group_dict[key] = obj[key][()]
-                result[name] = group_dict
-                
-        f.visititems(visit_handler)
-    
+    import h5py
+
+    def read_group(group):
+        out = {}
+        for key, item in group.items():
+            if isinstance(item, h5py.Dataset):
+                out[key] = item[()]
+            elif isinstance(item, h5py.Group):
+                out[key] = read_group(item)
+        return out
+
+    with h5py.File(hdf5_path, "r") as f:
+        result = read_group(f)
+
     return result
 
 def get_files(directory, extension):
