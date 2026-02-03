@@ -1,6 +1,6 @@
 import sys
 sys.path.append('./')
-
+from robot.robot.base_robot_node import build_robot_node
 import os
 import importlib
 import argparse
@@ -79,6 +79,7 @@ def parse_args_and_config():
     parser.add_argument("--max_step", type=int, default=1000000, help="the maximum step for each episode")
     parser.add_argument("--robotwin", action="store_true", help="If using RoboTwin pipeline, you should set it.")
     parser.add_argument("--video", type=str, default=None, help="Recording the video if set, should set to cam_name like cam_head.")
+    parser.add_argument("--node", type=str, default=None, help="If get data by parallel.")
     parser.add_argument("--overrides", nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
@@ -197,6 +198,8 @@ def init():
         model = RoboTwinModel(base_model, encode_obs, args["base_task_name"])
         
     base_robot_class = get_class(f"my_robot.{args['base_robot_name']}", args["base_robot_class"])
+    if args["node"]:
+        base_robot_class = build_robot_node(base_robot_class)
     robot = base_robot_class()
 
     return model, robot, args["episode_num"], args["max_step"], is_video

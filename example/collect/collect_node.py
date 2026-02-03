@@ -1,97 +1,5 @@
-from robot.robot.base_robot import Robot
+from robot.robot.base_robot_node import build_robot_node
 from robot.utils.base.data_handler import is_enter_pressed, debug_print, dict_to_list
-from robot.utils.node.node import TaskNode
-from robot.utils.node.scheduler import Scheduler
-
-from threading import Lock
-import time
-
-ROBOT_MAP = {
-    "sensor": {
-        "image": 30,
-    },
-    "controller": {
-        "arm": 120,
-    }
-}
-
-class DataBuffer:
-    def __init__(self):
-        self._buffer = {}
-        self.lock = Lock()
-    
-    def update(self, name, data):
-        with self.lock:
-            if name in self._buffer.keys():
-                for k,v in data.items():
-                    self._buffer[name][k].append(v)
-            else:
-                self._buffer[name] = data
-                for k,v in self._buffer[name].items():
-                    self._buffer[name][k] = [v]
-    
-    def get(self):
-        with self.lock:
-            # import pdb;pdb.set_trace()
-            try:
-                ret = dict_to_list(self._buffer)
-            except:
-                print("ERROR OCCURED!")
-                import pdb;pdb.set_trace()
-                exit()
-            return ret
-    
-    def clear(self):
-        with self.lock:
-            self._buffer = {}
-
-class ComponentNode(TaskNode):
-    def task_init(self, component, data_buffer: DataBuffer):
-        self.component = component
-        self.data_buffer = data_buffer
-    
-    def task_step(self):
-        data = self.component.get()
-        self.data_buffer.update(self.component.name, data)
-
-def init(robot: Robot):
-    sensor_data_buffers = {}
-    sensor_nodes = {}
-    for sensor_type in ROBOT_MAP["sensor"].keys():
-        sensor_nodes[sensor_type] = []
-        sensor_data_buffers[sensor_type] = DataBuffer()
-        for sensor_name, sensor in robot.sensors[sensor_type].items():
-            sensor_node = ComponentNode(sensor_name, component=sensor, data_buffer=sensor_data_buffers[sensor_type])
-            sensor_node.start()
-            sensor_nodes[sensor_type].append(sensor_node)
-
-    controller_data_buffers = {}
-    controller_nodes = {}
-    for controller_type in ROBOT_MAP["controller"].keys():
-        controller_nodes[controller_type] = []
-        controller_data_buffers[controller_type] = DataBuffer()
-        for controller_name, controller in robot.controllers[controller_type].items():
-            controller_node = ComponentNode(controller_name, component=controller, data_buffer=controller_data_buffers[controller_type])
-            controller_node.start()
-            controller_nodes[controller_type].append(controller_node)
-    
-    return sensor_data_buffers, sensor_nodes, controller_data_buffers, controller_nodes
-
-def build_map(sensor_nodes, controller_nodes):
-    sensor_schedulers = {}
-    for sensor_type in ROBOT_MAP["sensor"].keys():
-        sensor_schedulers[sensor_type] = Scheduler(entry_nodes=sensor_nodes[sensor_type], 
-                                                    all_nodes=sensor_nodes[sensor_type],
-                                                    final_nodes=sensor_nodes[sensor_type],
-                                                    hz=ROBOT_MAP["sensor"][sensor_type])
-    controller_schedulers = {}
-    for controller_type in ROBOT_MAP["controller"].keys():
-        controller_schedulers[controller_type] = Scheduler(entry_nodes=controller_nodes[controller_type], 
-                                                    all_nodes=controller_nodes[controller_type],
-                                                    final_nodes=controller_nodes[controller_type],
-                                                    hz=ROBOT_MAP["controller"][controller_type])
-    
-    return sensor_schedulers, controller_schedulers
 
 condition = {
     "save_path": "./save/test_dt/",
@@ -101,52 +9,49 @@ condition = {
 }
 
 if __name__ == "__main__":
-    from my_robot.xspark_robot import XsparkRobot
-    robot = XsparkRobot(move_check=False, condition=condition)
-    robot.set_up(teleop=True)
-    episode_num = 10
+    import os
+    os.environ["INFO_LEVEL"] = "DEBUG" # DEBUG , INFO, ERROR
 
-    for _ in range(episode_num):
-        sensor_data_buffers, sensor_nodes, controller_data_buffers, controller_nodes = init(robot)
+    robot = TestRobot()
+    robot_cls = build_robot_node(TestRobot)
+    robot = robot_cls(condition=condition)
+    robot.set_up()
 
-        sensor_schedulers, controller_schedulers = build_map(sensor_nodes, controller_nodes)
+    start_episode = 0
+    num_episode = 5
 
-        debug_print("collect_node", "Waiting for ENTER to start...", "INFO")
-
-        while not is_enter_pressed():
-            time.sleep(0.1)
-        debug_print("collect_node", "Collect start! Press ENTER to finish!", "INFO")
-
-        for sensor_scheduler in sensor_schedulers.values():
-            sensor_scheduler.start()
+    for episode_id in range(start_episode, start_episode + num_episode):
+        robot.reset()
+        debug_print("main", "Press Enter to start...", "INFO")
+        while not robot.is_start() or not is_enter_pressed():
+            time.sleep(1/robot.condition["save_freq"])
         
-        for controller_scheduler in controller_schedulers.values():
-            controller_scheduler.start()
-        
-        while not is_enter_pressed():
-            time.sleep(0.1)  
+        debug_print("main", "Press Enter to finish...", "INFO")
 
-        for sensor_scheduler in sensor_schedulers.values():
-            sensor_scheduler.stop()
-        
-        for controller_scheduler in controller_schedulers.values():
-            controller_scheduler.stop()      
+        avg_collect_time = 0.0
+        collect_num = 0
+        while True:
+            last_time = time.monotonic()
 
-        for key, sensor_data_buffer in sensor_data_buffers.items():
-            print(key)
-            datas = sensor_data_buffer.get()
-            for data in datas:
-                d = [None, data]
-                # import pdb;pdb.set_trace()
-                robot.collect(d)
+            data = robot.get()
+            robot.collect(data)
+            
+            if is_enter_pressed():
+                robot.finish(episode_id)
+                break
+                
+            collect_num += 1
+            while True:
+                now = time.monotonic()
+                if now -last_time > 1/robot.condition["save_freq"]:
+                    avg_collect_time += now -last_time
+                    break
+                else:
+                    time.sleep(0.001)
+        extra_info = {}
+        avg_collect_time = avg_collect_time / collect_num
+        extra_info["avg_time_interval"] = avg_collect_time
+        robot.collection.add_extra_condition_info(extra_info)
 
-        for controller_data_buffer in controller_data_buffers.values():
-            datas = controller_data_buffer.get()
-            for data in datas:
-                d = [data, None]
-                robot.collect(d,)
-        
-        robot.finish()
-        
 
 
