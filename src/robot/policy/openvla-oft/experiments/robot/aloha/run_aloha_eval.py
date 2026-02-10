@@ -7,7 +7,6 @@ Evaluates a model in a real-world ALOHA environment.
 import logging
 import os
 import socket
-import sys
 import time
 from collections import deque
 from robot.dataclasses import dataclass
@@ -18,7 +17,7 @@ import draccus
 import tqdm
 
 # Append current directory so that interpreter can find experiments.robot
-sys.path.append(".")
+
 from experiments.robot.aloha.aloha_utils import (
     get_aloha_env,
     get_aloha_image,

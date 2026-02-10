@@ -6,7 +6,6 @@ import os
 import json
 from tqdm import tqdm
 import subprocess
-import sys
 
 def visualize_hdf5(hdf5_path, output_dir="output", verbose=False):
     """

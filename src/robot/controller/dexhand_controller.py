@@ -1,5 +1,4 @@
-import sys
-sys.path.append("./")
+
 
 from robot.controller.controller import Controller
 from typing import Dict, Any

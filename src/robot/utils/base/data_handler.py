@@ -1,10 +1,10 @@
 import h5py
+import sys
 from typing import *
 from pathlib import Path
 import numpy as np
 import os
 import fnmatch
-import sys
 import select
 
 from scipy.spatial.transform import Rotation

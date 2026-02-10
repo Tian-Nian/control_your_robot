@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import hydra
 import dill
-import sys, os
 
 current_file_path = os.path.abspath(__file__)
 parent_dir = os.path.dirname(current_file_path)

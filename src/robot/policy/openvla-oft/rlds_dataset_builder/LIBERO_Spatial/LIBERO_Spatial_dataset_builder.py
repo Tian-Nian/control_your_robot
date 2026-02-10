@@ -6,7 +6,6 @@ import glob
 import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
-import sys
 from LIBERO_Spatial.conversion_utils import MultiThreadedDatasetBuilder
 
 

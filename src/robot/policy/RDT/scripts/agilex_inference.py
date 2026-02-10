@@ -5,7 +5,6 @@
 """
 
 import argparse
-import sys
 import threading
 import time
 import yaml
@@ -24,7 +23,7 @@ import cv2
 
 from scripts.agilex_model import create_model
 
-# sys.path.append("./")
+# 
 
 CAMERA_NAMES = ['cam_high', 'cam_right_wrist', 'cam_left_wrist']
 

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import sys
 import os
-sys.path.append("../../")
+
 
 import h5py
 import numpy as np

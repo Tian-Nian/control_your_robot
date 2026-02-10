@@ -1,5 +1,3 @@
-import sys
-sys.path.append('./')
 
 import socket
 import numpy as np

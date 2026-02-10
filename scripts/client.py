@@ -1,5 +1,3 @@
-import sys
-sys.path.append('./')
 
 from my_robot.test_robot import TestRobot
 

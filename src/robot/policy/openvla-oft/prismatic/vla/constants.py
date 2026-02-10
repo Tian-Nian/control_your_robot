@@ -4,7 +4,6 @@ Important constants for VLA training and evaluation.
 Attempts to automatically identify the correct constants to set based on the Python command used to launch
 training or evaluation. If it is unclear, defaults to using the LIBERO simulation benchmark constants.
 """
-import sys
 from enum import Enum
 
 # Llama 2 token constants

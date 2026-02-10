@@ -7,7 +7,6 @@ Evaluates a trained policy in a LIBERO simulation benchmark task suite.
 import json
 import logging
 import os
-import sys
 from collections import deque
 from robot.dataclasses import dataclass
 from enum import Enum
@@ -22,7 +21,7 @@ from libero.libero import benchmark
 import wandb
 
 # Append current directory so that interpreter can find experiments.robot
-sys.path.append("../..")
+
 from experiments.robot.libero.libero_utils import (
     get_libero_dummy_action,
     get_libero_env,

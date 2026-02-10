@@ -9,7 +9,6 @@ from pathlib import Path
 current_file = Path(__file__)
 
 import json
-import sys
 parent_dir = current_file.parent
 sys.path.append(str(parent_dir))
 import os

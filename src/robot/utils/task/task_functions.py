@@ -1,5 +1,4 @@
-import sys
-sys.path.append("./")
+
 
 from robot.utils.task.task import YmlTask, Tasks
 

@@ -6,9 +6,7 @@ import glob
 import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
-import sys
-import sys
-sys.path.append('.')
+
 from robotwin_task_sample.conversion_utils import MultiThreadedDatasetBuilder
 
 def _generate_examples(paths) -> Iterator[Tuple[str, Any]]:

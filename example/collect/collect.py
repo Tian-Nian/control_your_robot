@@ -1,5 +1,6 @@
+from robot import ROBOT_PATH
 import sys
-sys.path.append("./")
+sys.path.append(ROBOT_PATH)
 
 import select
 

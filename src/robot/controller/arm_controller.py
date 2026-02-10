@@ -1,11 +1,11 @@
-import sys
-sys.path.append("./")
 
+
+from abc import abstractmethod
+from typing import Dict, Any
 import numpy as np
 
 from robot.controller.controller import Controller
 from robot.utils.base.data_handler import debug_print
-from typing import Dict, Any
 
 class ArmController(Controller):
     def __init__(self):
@@ -14,24 +14,24 @@ class ArmController(Controller):
         self.controller = None
         self.controller_type = "robotic_arm"
 
-    def get_information(self):
+    def get_information(self) -> Dict[str, Any]:
         arm_info = {}
         state = self.get_state()
         if "joint" in self.collect_info:
-            arm_info["joint"] = state["joint"]
+            arm_info["joint"] = state.get("joint")
         if "qpos" in self.collect_info:
-            arm_info["qpos"] = state["qpos"]
+            arm_info["qpos"] = state.get("qpos")
         if "gripper" in self.collect_info:
-            arm_info["gripper"] = state["gripper"]
+            arm_info["gripper"] = state.get("gripper")
         if "action" in self.collect_info:
-            arm_info["action"] = state["action"]
+            arm_info["action"] = state.get("action")
         if "velocity" in self.collect_info:
-            arm_info["velocity"] = state["velocity"]
+            arm_info["velocity"] = state.get("velocity")
         if "force" in self.collect_info:
-            arm_info["force"] = state["force"]
+            arm_info["force"] = state.get("force")
         return arm_info
     
-    def move_controller(self, move_data:Dict[str, Any], is_delta=False):
+    def move_controller(self, move_data: Dict[str, Any], is_delta=False):
         if is_delta:
             now_state = self.get_state()
             for key, value in move_data.items():
@@ -58,6 +58,35 @@ class ArmController(Controller):
                 self.set_velocity(np.array(value))
             if key == "force":
                 self.set_force(np.array(value))
+
+    @abstractmethod
+    def get_state(self) -> Dict[str, Any]:
+        """Get the current state of the arm (joint, qpos, etc.)."""
+        pass
+
+    def set_joint(self, joint: np.ndarray):
+        pass
+
+    def set_position(self, position: np.ndarray):
+        pass
+
+    def set_gripper(self, gripper: np.ndarray):
+        pass
+    
+    def set_action(self, action: np.ndarray):
+        pass
+
+    def set_velocity(self, velocity: np.ndarray):
+        pass
+
+    def set_force(self, force: np.ndarray):
+        pass
+
+    def set_position_teleop(self, position: np.ndarray):
+        pass
+
+    def set_up(self):
+        pass
 
     def __repr__(self):
         if self.controller is not None:

@@ -1,5 +1,3 @@
-import sys
-sys.path.append('./')
 
 # change to your controller and test_controller
 # from robot.controller.Piper_controller import PiperController

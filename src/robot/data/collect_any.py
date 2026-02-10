@@ -3,8 +3,7 @@ This function stores all incoming data without any filtering or condition checks
 The storage format differs from the standard format used for dual-arm robots:
 each controller/sensor corresponds to a separate group.
 """
-import sys
-sys.path.append("./")
+
 
 import threading, os
 

@@ -1,5 +1,6 @@
+from robot import ROBOT_PATH
 import sys
-sys.path.append("./")
+sys.path.append(ROBOT_PATH)
 
 from robot.utils.task.task import YmlTask, Tasks, ShareSpace
 from my_robot.test_robot import TestRobot

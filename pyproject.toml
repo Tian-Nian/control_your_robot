@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "robot"
+name = "control_your_robot"
 version = "1.0"
 description = "control_your_robot open source repo"
 readme = "README.md"

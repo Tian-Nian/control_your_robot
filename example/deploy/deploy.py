@@ -1,5 +1,7 @@
+from robot import ROBOT_PATH
 import sys
-sys.path.append('./')
+sys.path.append(ROBOT_PATH)
+
 from robot.robot.base_robot_node import build_robot_node
 import os
 import importlib
@@ -167,11 +169,6 @@ class RoboTwinModel:
                                                    "right_gripper": state[13]}
     
     def get_action(self):
-        # if self.model.observation_window is None:
-        #     instruction = self.TASK_ENV.get_instruction()
-        #     self.model.set_language(instruction)
-
-        # input_rgb_arr, input_state = self.encode_obs(self.observation_window)
         obs = self.encode_obs(self.observation_window)
         # ======== Get Action ========
         actions = self.model.get_action(obs)[:]

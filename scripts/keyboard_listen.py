@@ -10,7 +10,6 @@ ROS1 节点：读取键盘输入并发布到 /key_cmd
 
 import rospy
 from std_msgs.msg import String
-import sys
 import select
 import termios
 import tty

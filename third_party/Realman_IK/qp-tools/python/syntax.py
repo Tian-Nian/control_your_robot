@@ -2,7 +2,6 @@ import numpy as np
 import qpSWIFT
 
 ### To remove traceback call statements
-import sys
 sys.tracebacklimit = 0
 
 

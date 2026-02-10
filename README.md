@@ -10,6 +10,9 @@
 </p>
 if the wechat group overdue, you could add my wechat to join in.
 
+# Robot Node support!
+Now you can you `example/collect/collect_node.py` to easily collect robot data paradell, this pipeline will decorate Robot class with an node. Just have a try.
+
 # visualize data by rerun!
 refer to `scripts/visual_hdf5_rerun.sh` to visual your data, support type:
 1. control_your_robot raw data
@@ -93,21 +96,20 @@ os.environ["INFO_LEVEL"] = "DEBUG" # DEBUG , INFO, ERROR
 ```
 
 1. Data Collection Tests
+
+To collect your robot data, just change the robot class in this file.
 ```bash
-# Multi-process (strict time-synchronized collection using TimeScheduler)
-python example/collect/collect_mp_robot.py
-# Multi-process (separate process for each component)
-python example/collect/collect_mp_component.py
-# Multi-process (separate process for each component, and have diffrent save_freq for each, this will save timestamp)
-python example/collect/collect_mp_component_different_time_freq.py
+# Node collect
+python exaexample/collect/collect_node.py
 # Single-threaded (may have accumulated delays due to function execution)
 python example/collect/collect.py
 ```
 
 2. Model Deployment Tests
+
+To deploy the model on your robot, you just need to setup a model class in `src/robot/policy/test_policy/inference_model.py` like under `src/robot/policy/`. Then setup your robot in `scripts/deploy.sh`.
+
 ```bash
-# Run a straightforward deployment test
-python example/deploy/robot_on_test.py
 # General deployment script
 bash deploy.sh
 # Offline data replay consistency test
@@ -116,6 +118,9 @@ bash eval_offline.sh
 ```
 
 3. Remote Deployment and Data Transfer
+
+Just change the robot / model class in the file, and correctly set the input/output transform.
+
 ```bash
 # Start the server first, simulating the inference side (allows multiple connections, listens on a port)
 python scripts/server.py

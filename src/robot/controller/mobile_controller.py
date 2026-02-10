@@ -1,6 +1,6 @@
-import sys
-sys.path.append("./")
 
+
+from abc import abstractmethod
 from robot.controller.controller import Controller
 from typing import Dict, Any
 import numpy as np
@@ -28,6 +28,21 @@ class MobileController(Controller):
         if "position" in self.collect_info:
             mobile_info["position"] = self.get_position() 
         return mobile_info
+
+    def set_move_velocity(self, velocity: np.ndarray):
+        pass
+
+    def set_move_to(self, target: np.ndarray):
+        pass
+
+    def get_move_velocity(self) -> np.ndarray:
+        pass
+
+    def get_position(self) -> np.ndarray:
+        pass
+
+    def set_up(self):
+        pass
 
     def __repr__(self):
         if self.controller is not None:

@@ -3,7 +3,6 @@ import json
 import os
 import time
 import argparse
-import sys
 import signal
 import random
 from multiprocessing import Process

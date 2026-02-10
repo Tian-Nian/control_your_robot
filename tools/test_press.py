@@ -1,4 +1,3 @@
-import sys
 import termios
 import tty
 import select

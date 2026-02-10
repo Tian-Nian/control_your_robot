@@ -1,5 +1,4 @@
-import sys
-sys.path.append("./")
+
 
 from rm_msgs.msg import GetArmState_Command, Arm_Current_State, MoveJ, CartePos 
 from geometry_msgs.msg import Pose, Point, Quaternion

@@ -1,5 +1,4 @@
-import sys
-sys.path.append("./")
+
 from robot.controller import *
 import time
 from typing import *

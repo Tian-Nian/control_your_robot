@@ -1,5 +1,4 @@
-import sys
-sys.path.append("./")
+
 
 from robot.sensor.touch_sensor import TouchSensor
 from robot.utils.ros.ros2_subscriber import ROS2Subscriber 

@@ -1,8 +1,8 @@
-import sys
-sys.path.append("./")
+
 
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
+from abc import ABC, abstractmethod
 import numpy as np
 import time
 import json
@@ -20,16 +20,16 @@ import cv2
 # add your controller/sensor type here
 ALLOW_TYPES = ["arm", "mobile","image", "tactile", "teleop"]
 
-condition = {
+DEFAULT_CONDITION = {
     "save_path": "./save/", 
     "task_name": "base", 
     "save_format": "hdf5", 
     "save_freq": 10,
 }
 
-class Robot:
+class Robot(ABC):
     def __init__(self, 
-                condition=condition,
+                condition: Optional[Dict[str, Any]] = None,
                 move_check=True, 
                 start_episode=0) -> None:
           
@@ -37,18 +37,20 @@ class Robot:
         self.controllers = {}
         self.sensors = {}
 
-        self.condition = condition
-        self.collection = CollectAny(condition, move_check=move_check, start_episode=start_episode)
+        self.condition = condition if condition is not None else DEFAULT_CONDITION
+        self.collection = CollectAny(self.condition, move_check=move_check, start_episode=start_episode)
 
+    @abstractmethod
     def set_up(self):
+        """Must be implemented by child class to initialize controllers and sensors."""
         for controller_type in self.controllers.keys():
             if controller_type not in ALLOW_TYPES:
-                debug_print(self.name, f"It's recommanded to set your controller type into our format.\nYOUR STPE:{controller_type}\n\
+                debug_print(self.name, f"It's recommended to set your controller type into our format.\nYOUR TYPE:{controller_type}\n\
                             ALLOW_TYPES:{ALLOW_TYPES}", "WARNING")
         
         for sensor_type in self.sensors.keys():
             if sensor_type not in ALLOW_TYPES:
-                debug_print(self.name, f"It's recommanded to set your sensor type into our format.\nYOUR STPE:{sensor_type}\n\
+                debug_print(self.name, f"It's recommended to set your sensor type into our format.\nYOUR TYPE:{sensor_type}\n\
                             ALLOW_TYPES:{ALLOW_TYPES}", "WARNING")
         # debug_print(self.name, "set_up() should be realized by your robot class", "ERROR")
         # raise NotImplementedError

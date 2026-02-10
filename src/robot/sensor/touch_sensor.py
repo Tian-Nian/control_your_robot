@@ -1,5 +1,4 @@
-import sys
-sys.path.append("./")
+
 
 from robot.sensor.sensor import Sensor
 

@@ -1,6 +1,5 @@
 import numpy as np
 
-import sys
 import qpSWIFT
 import scipy.io as sio
 

@@ -1,8 +1,6 @@
 '''
 实现多个子任务连续执行
 '''
-import sys
-sys.path.append('./')
 
 import abc
 from typing import List, Optional, Any, Iterable, Union

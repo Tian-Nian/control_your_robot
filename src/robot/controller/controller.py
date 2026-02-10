@@ -1,18 +1,17 @@
-import sys
-sys.path.append("./")
-
-from typing import List
+from typing import List, Dict, Any
+from abc import ABC, abstractmethod
 import numpy as np
 import time
 
 from robot.utils.base.data_handler import debug_print
 
-class Controller:
+class Controller(ABC):
     def __init__(self, timestamp=True):
         self.name = "controller"
         self.controller_type = "base_controller"
         # self.is_set_up = False
         self.timestamp = timestamp
+        self.collect_info = None
     
     def set_collect_info(self, collect_info:List[str]):
         self.collect_info = collect_info
@@ -42,12 +41,25 @@ class Controller:
         except Exception as e:
             debug_print(self.name, f"move error: {e}", "WARNING")
     
+    @abstractmethod
+    def get_information(self) -> Dict[str, Any]:
+        """Get raw information from the controller."""
+        pass
+
+    @abstractmethod
+    def move_controller(self, move_data: Dict[str, Any], is_delta: bool = False):
+        """Execute movement commands."""
+        pass
+
    # init controller
+    @abstractmethod
     def set_up(self):
-        raise NotImplementedError("This method should be implemented by the subclass")
+        """Initialize the controller."""
+        pass
     
     # print controller
     def __repr__(self):
+        return f"{self.name}: {self.controller_type}"
         return f"Base Controller, can't be used directly \n \
                 name: {self.name} \n \
                 controller_type: {self.controller_type}"

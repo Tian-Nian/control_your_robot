@@ -1,5 +1,4 @@
-import sys
-sys.path.append('third_party/Realman_IK/')
+
 
 import qpSWIFT
 import numpy as np

@@ -1,5 +1,4 @@
-import sys
-sys.path.append("./")
+
 
 from robot.sensor.touch_sensor import TouchSensor
 import numpy as np

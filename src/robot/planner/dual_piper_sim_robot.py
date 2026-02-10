@@ -4,8 +4,7 @@ import numpy as np
 import cv2
 from pynput import keyboard
 import time
-import sys
-sys.path.append("./")
+
 from planner.curobo_planner import CuroboPlanner
 
 x, y, z =0.0, 0.0, 0.0

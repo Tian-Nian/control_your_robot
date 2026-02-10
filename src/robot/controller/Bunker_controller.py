@@ -1,5 +1,4 @@
-import sys
-sys.path.append("./")
+
 
 from robot.controller.mobile_controller import MobileController
 

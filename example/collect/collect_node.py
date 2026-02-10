@@ -1,16 +1,22 @@
+from robot import ROBOT_PATH
+import sys
+sys.path.append(ROBOT_PATH)
+
 from robot.robot.base_robot_node import build_robot_node
-from robot.utils.base.data_handler import is_enter_pressed, debug_print, dict_to_list
+from robot.utils.base.data_handler import is_enter_pressed, debug_print
 
 condition = {
     "save_path": "./save/test_dt/",
     "task_name": "new",
     "save_format": "hdf5",
-    "save_freq": 10, 
+    "save_freq": 30, 
 }
 
 if __name__ == "__main__":
+    from my_robot.test_robot import TestRobot
+    import time
     import os
-    os.environ["INFO_LEVEL"] = "DEBUG" # DEBUG , INFO, ERROR
+    os.environ["INFO_LEVEL"] = "INFO" # DEBUG , INFO, ERROR
 
     robot = TestRobot()
     robot_cls = build_robot_node(TestRobot)
@@ -52,6 +58,3 @@ if __name__ == "__main__":
         avg_collect_time = avg_collect_time / collect_num
         extra_info["avg_time_interval"] = avg_collect_time
         robot.collection.add_extra_condition_info(extra_info)
-
-
-

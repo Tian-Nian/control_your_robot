@@ -1,6 +1,3 @@
-import sys
-sys.path.append("./")
-
 import numpy as np
 
 from robot.robot.base_robot import Robot
@@ -11,7 +8,7 @@ from robot.sensor.TestVision_sensor import TestVisonSensor
 from robot.utils.base.data_handler import debug_print
 from robot.data.collect_any import CollectAny
 
-from robot.utils.base.data_transofrm_pipeline import image_rgb_encode_pipeline, general_hdf5_rdt_format_pipeline
+from robot.utils.base.data_transform_pipeline import image_rgb_encode_pipeline, general_hdf5_rdt_format_pipeline
 
 condition = {
     "save_path": "./save/", 
@@ -46,7 +43,7 @@ class TestRobot(Robot):
         # self.collection._add_data_transform_pipeline(image_rgb_encode_pipeline)
         # self.collection._add_data_transform_pipeline(general_hdf5_rdt_format_pipeline)
     
-    def set_up(self):
+    def set_up(self, teleop=False):
         super().set_up()
 
         self.controllers["arm"]["left_arm"].set_up()
@@ -60,8 +57,22 @@ class TestRobot(Robot):
                                "image": ["color"],
                                })
     
-    def is_start(self):
-        return True
+    def reset(self):
+        move_data = {
+            "arm":{
+                "left_arm":{
+                    "joint": [0, 0, 0, 0, 0, 0],
+                    # "joint": [0.3, 0, 0, 0, 0, 0],
+                    "gripper":  1.0,
+                },
+                
+                "right_arm":{
+                    "joint": [0, 0, 0, 0, 0, 0],
+                    "gripper":  1.0,
+                }
+            }
+        }
+        self.move(move_data)
 
 if __name__ == "__main__":
     import os

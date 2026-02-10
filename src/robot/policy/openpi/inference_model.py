@@ -9,12 +9,10 @@ from pathlib import Path
 # get current workspace
 current_file = Path(__file__)
 
-import sys
 parent_dir = current_file.parent
 sys.path.append(str(parent_dir))
 
 import json
-import sys
 import jax
 import numpy as np
 from openpi.models import model as _model

@@ -23,7 +23,6 @@ import h5py
 import numpy as np
 import os
 import json
-import sys
 from tqdm import tqdm
 import argparse
 from pathlib import Path

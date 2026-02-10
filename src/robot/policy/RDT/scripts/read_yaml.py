@@ -1,4 +1,3 @@
-import sys
 import yaml
 
 def read_yaml_value(file_path, key):

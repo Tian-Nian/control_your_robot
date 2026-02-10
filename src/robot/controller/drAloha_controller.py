@@ -1,8 +1,7 @@
 
 from cgi import test
 import math
-import sys
-sys.path.append("./")
+
 
 import os
 current_script_path = os.path.abspath(__file__)

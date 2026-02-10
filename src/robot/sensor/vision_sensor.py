@@ -1,6 +1,7 @@
-import sys
-sys.path.append("./")
 
+
+from abc import abstractmethod
+from typing import Dict, Any
 from robot.sensor.sensor import Sensor
 
 class VisionSensor(Sensor):
@@ -27,6 +28,11 @@ class VisionSensor(Sensor):
             image_info["point_cloud"] = image["point_cloud"]
         
         return image_info
+
+    @abstractmethod
+    def get_image(self) -> Dict[str, Any]:
+        """Retrieve images from the sensor (color, depth, etc.)."""
+        pass
 
     
     
