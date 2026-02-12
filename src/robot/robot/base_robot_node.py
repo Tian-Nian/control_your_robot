@@ -13,6 +13,8 @@ ROBOT_MAP = {
     },
     "controller": {
         "arm": 200,
+        "mobile": 100,
+        "hand": 100,
     }
 }
 
@@ -25,7 +27,7 @@ class DataBuffer:
     def update(self, name, data):
         self.show_buffer[name] = data
     
-    def get_lastest(self):
+    def get_latest(self):
         return self.show_buffer
 
 class ComponentNode(TaskNode):
@@ -51,14 +53,14 @@ class CollectNode(TaskNode):
             controller_obs = {}
             
             for data_buffer in self.controller_buffers:
-                data_dict = data_buffer.get_lastest()
+                data_dict = data_buffer.get_latest()
                 for k,v in data_dict.items():
                     controller_obs[k] = v
             self.controller_episode.append(controller_obs)
 
             sensor_obs = {}
             for data_buffer in self.sensor_buffers:
-                data_dict = data_buffer.get_lastest()
+                data_dict = data_buffer.get_latest()
                 for k,v in data_dict.items():
                     sensor_obs[k] = v
             self.sensor_episode.append(sensor_obs)
@@ -76,7 +78,7 @@ def init(robot: Robot):
 
     sensor_data_buffers = {}
     sensor_nodes = {}
-    for sensor_type in ROBOT_MAP["sensor"].keys():
+    for sensor_type in robot.sensors.keys():
         sensor_nodes[sensor_type] = []
         sensor_data_buffers[sensor_type] = DataBuffer()
 
@@ -85,10 +87,9 @@ def init(robot: Robot):
             sensor_node.start()
             sensor_nodes[sensor_type].append(sensor_node)
         
-
     controller_data_buffers = {}
     controller_nodes = {}
-    for controller_type in ROBOT_MAP["controller"].keys():
+    for controller_type in robot.controllers.keys():
         controller_nodes[controller_type] = []
         controller_data_buffers[controller_type] = DataBuffer()
 
@@ -105,32 +106,30 @@ def init(robot: Robot):
 
 def build_map(sensor_nodes, controller_nodes):
     sensor_schedulers = {}
-    for sensor_type in ROBOT_MAP["sensor"].keys():
+    for sensor_type in sensor_nodes.keys():
+        sensor_hz = ROBOT_MAP["sensor"].get(sensor_type, 30)
         sensor_schedulers[sensor_type] = Scheduler(entry_nodes=sensor_nodes[sensor_type], 
                                                     all_nodes=sensor_nodes[sensor_type],
                                                     final_nodes=sensor_nodes[sensor_type],
-                                                    hz=ROBOT_MAP["sensor"][sensor_type])
+                                                    hz=sensor_hz)
     controller_schedulers = {}
-    for controller_type in ROBOT_MAP["controller"].keys():
+    for controller_type in controller_nodes.keys():
+        controller_hz = ROBOT_MAP["controller"].get(controller_type, 30)
         controller_schedulers[controller_type] = Scheduler(entry_nodes=controller_nodes[controller_type], 
                                                     all_nodes=controller_nodes[controller_type],
                                                     final_nodes=controller_nodes[controller_type],
-                                                    hz=ROBOT_MAP["controller"][controller_type])
-    
+                                                    hz=controller_hz)
 
     return sensor_schedulers, controller_schedulers
 
 def build_robot_node(base_robot_cls):
     class RobotNode(base_robot_cls):
-        def __init__(self,
-                condition = None,
-                move_check=True, 
-                start_episode=0):
-            super().__init__(condition=condition, move_check=move_check, start_episode=start_episode)
+        def __init__(self, base_config):
+            super().__init__(base_config=base_config)
             self.name = self.name + "_node"
         
-        def set_up(self, **kargs):
-            super().set_up(**kargs)
+        def set_up(self, teleop=False):
+            super().set_up(teleop=teleop)
             
             (
                 self.sensor_data_buffers,
@@ -154,12 +153,12 @@ def build_robot_node(base_robot_cls):
             controller_data = {}
 
             for buf in self.controller_data_buffers.values():
-                for k, v in buf.get_lastest().items():
+                for k, v in buf.get_latest().items():
                     controller_data[k] = v
 
             sensor_data = {}
             for buf in self.sensor_data_buffers.values():
-                for k, v in buf.get_lastest().items():
+                for k, v in buf.get_latest().items():
                     sensor_data[k] = v
 
             return controller_data.copy(), sensor_data.copy()
