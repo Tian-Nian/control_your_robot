@@ -3,6 +3,10 @@
 
 [Chinese WIKI](https://tian-nian.github.io/control_your_robot-doc/)
 
+# A new open-source project has been released, building upon this project.
+[X-One-Pipeline](https://github.com/XsparkAI/X-One-Pipeline)
+This project now just provide sample based on Y1-IMETA cause we only have this brand robotic arm. Other brand robotic arm also support, you can find it at src.robot.controller, same as this project, and to realize a new robot, just make a config like config/x-one.yml, and a ${robot}.py at src/robot/robot, add it into src/robot/robot/__init__.py, then you can use your robot in the new project.
+
 # WECHAT
 <p align="center">
   <img src="imgs/Wechat.jpg" alt="wechat_group" width="400">
