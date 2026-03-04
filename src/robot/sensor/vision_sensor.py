@@ -5,18 +5,17 @@ from typing import Dict, Any
 from robot.sensor.sensor import Sensor
 
 class VisionSensor(Sensor):
-    def __init__(self, encode_rgb=False):
+    def __init__(self):
         super().__init__()
         self.name = "vision_sensor"
         self.type = "vision_sensor"
         self.collect_info = None
-        self.encode_rgb = encode_rgb
 
     def get_information(self):
         image_info = {}
         image = self.get_image()
         if "color" in self.collect_info:
-            if getattr(self, "encode_rgb", False):
+            if getattr(self, "is_jpeg", True):
                 import cv2
                 success, encoded_image = cv2.imencode('.jpg', image["color"])
                 jpeg_data = encoded_image.tobytes()

@@ -24,8 +24,9 @@ class VisionROSensor(VisionSensor):
         self.name = name
         self.cv_bridge = CvBridge()
     
-    def set_up(self, topic, depth_topic=None):
+    def set_up(self, topic, depth_topic=None, is_jpeg=False):
         self.controller = {}
+        self.is_jpeg = is_jpeg
 
         if depth_topic is None:
             self.is_depth = False

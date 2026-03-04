@@ -16,8 +16,8 @@ def find_device_by_serial(devices, serial):
     return None
 
 class RealsenseSensor(VisionSensor):
-    def __init__(self, name, encode_rgb=False):
-        super().__init__(encode_rgb=encode_rgb)
+    def __init__(self, name, ):
+        super().__init__()
         self.name = name
         # 添加线程控制变量
         self.frame_buffer = deque(maxlen=1)  # 仅保留最新帧
@@ -25,8 +25,8 @@ class RealsenseSensor(VisionSensor):
         self.exit_event = threading.Event()
         self.thread = None
         
-    def set_up(self,CAMERA_SERIAL,is_depth = False, encode_rgb=False):
-        self.encode_rgb = encode_rgb
+    def set_up(self,CAMERA_SERIAL,is_depth = False, is_jpeg=False):
+        self.is_jpeg = is_jpeg
         self.is_depth = is_depth
         try:
             # Initialize RealSense context and check for connected devices
