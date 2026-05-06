@@ -1,0 +1,114 @@
+solid gemini305_visual
+  facet normal 0 0 -1
+    outer loop
+      vertex -0.021 -0.021 -0.0115
+      vertex 0.021 0.021 -0.0115
+      vertex 0.021 -0.021 -0.0115
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex -0.021 -0.021 -0.0115
+      vertex -0.021 0.021 -0.0115
+      vertex 0.021 0.021 -0.0115
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex -0.021 -0.021 0.0115
+      vertex 0.021 -0.021 0.0115
+      vertex 0.021 0.021 0.0115
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex -0.021 -0.021 0.0115
+      vertex 0.021 0.021 0.0115
+      vertex -0.021 0.021 0.0115
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex -0.021 -0.021 -0.0115
+      vertex 0.021 -0.021 -0.0115
+      vertex 0.021 -0.021 0.0115
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex -0.021 -0.021 -0.0115
+      vertex 0.021 -0.021 0.0115
+      vertex -0.021 -0.021 0.0115
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex -0.021 0.021 -0.0115
+      vertex 0.021 0.021 0.0115
+      vertex 0.021 0.021 -0.0115
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex -0.021 0.021 -0.0115
+      vertex -0.021 0.021 0.0115
+      vertex 0.021 0.021 0.0115
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex -0.021 -0.021 -0.0115
+      vertex -0.021 -0.021 0.0115
+      vertex -0.021 0.021 0.0115
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex -0.021 -0.021 -0.0115
+      vertex -0.021 0.021 0.0115
+      vertex -0.021 0.021 -0.0115
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 0.021 -0.021 -0.0115
+      vertex 0.021 0.021 -0.0115
+      vertex 0.021 0.021 0.0115
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 0.021 -0.021 -0.0115
+      vertex 0.021 0.021 0.0115
+      vertex 0.021 -0.021 0.0115
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex -0.013 -0.025 -0.004
+      vertex -0.005 -0.025 -0.004
+      vertex -0.005 -0.025 0.004
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex -0.013 -0.025 -0.004
+      vertex -0.005 -0.025 0.004
+      vertex -0.013 -0.025 0.004
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0.005 -0.025 -0.004
+      vertex 0.013 -0.025 -0.004
+      vertex 0.013 -0.025 0.004
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0.005 -0.025 -0.004
+      vertex 0.013 -0.025 0.004
+      vertex 0.005 -0.025 0.004
+    endloop
+  endfacet
+endsolid gemini305_visual

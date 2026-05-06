@@ -14,6 +14,11 @@ This project now just provide sample based on Y1-IMETA cause we only have this b
 </p>
 if the wechat group overdue, you could add my wechat to join in.
 
+# Piper new sdk pyAgxArm support!
+We now support the new Piper SDK--pyAgxArm, which is more efficient and easier to use. You can refer to `src/robot/controller/PiperAgx_controller.py` for details. 
+In this new sdk, we support reset robotic-arm while in teleop mode, cause we enable gravity-compensation by MIT control. But be careful when you reset the robot, make sure the robot is in a safe position to avoid any damage.
+We also provide a simple teleop script `example/teleop/master_slave_arm_teleop_fs.py` to show how to use the new sdk to control the robot, you can have a try. Also a robot demo `agilex_piperAgx_dual_base.py` provided in `my_robot`.
+
 # Robot Node support!
 Now you can you `example/collect/collect_node.py` to easily collect robot data paradell, this pipeline will decorate Robot class with an node. Just have a try.
 

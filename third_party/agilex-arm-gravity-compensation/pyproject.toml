@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agilex_arm_gravity_compensation"
+version = "0.1.0"
+description = "Editable install wrapper for AgileX gravity compensation utilities"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+]
+
+[tool.setuptools]
+py-modules = ["agx_pinocchio"]

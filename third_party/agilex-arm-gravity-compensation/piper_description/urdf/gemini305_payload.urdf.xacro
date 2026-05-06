@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="orbbec_gemini305_payload">
+  <!--
+    Simplified payload model for gravity compensation.
+    Source dimensions and mass: Orbbec Gemini 305 Datasheet V1.0.
+    Size: 42 mm x 42 mm x 23 mm.
+    Mass: 68 g.
+
+    The link origin is the estimated geometric center of the camera body.
+    Put the macro origin at the measured camera center relative to the robot flange/tool frame.
+    Brackets, screws, adapters, and cables should be modeled as extra payload if they are mounted on the arm.
+  -->
+
+  <xacro:macro name="orbbec_gemini305_payload" params="parent *origin name:=gemini305_payload">
+    <xacro:property name="gemini305_width" value="0.042"/>
+    <xacro:property name="gemini305_height" value="0.042"/>
+    <xacro:property name="gemini305_depth" value="0.023"/>
+    <xacro:property name="gemini305_mass" value="0.068"/>
+
+    <!-- Box inertia about the geometric center, assuming uniform density. -->
+    <xacro:property name="gemini305_ixx" value="0.00001299"/>
+    <xacro:property name="gemini305_iyy" value="0.00001299"/>
+    <xacro:property name="gemini305_izz" value="0.00001999"/>
+
+    <joint name="${name}_joint" type="fixed">
+      <xacro:insert_block name="origin"/>
+      <parent link="${parent}"/>
+      <child link="${name}_link"/>
+    </joint>
+
+    <link name="${name}_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://meshes/gemini305_visual.stl"/>
+        </geometry>
+        <material name="gemini305_body">
+          <color rgba="0.08 0.08 0.08 1.0"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${gemini305_width} ${gemini305_height} ${gemini305_depth}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${gemini305_mass}"/>
+        <inertia
+          ixx="${gemini305_ixx}"
+          ixy="0"
+          ixz="0"
+          iyy="${gemini305_iyy}"
+          iyz="0"
+          izz="${gemini305_izz}"/>
+      </inertial>
+    </link>
+  </xacro:macro>
+</robot>
