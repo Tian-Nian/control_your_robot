@@ -94,7 +94,7 @@ bash train.sh RoboDojo stack_bowls piper_x joint 0 0
 
 **Step 5 — Offline evaluation (HDF5 replay)**
 
-Use `my_robot/replay_robot.py` with `config/replay_robot_*.yml`. Point `hdf5_paths` to the **`data/`** subdirectory and set `hdf5_format: xspark`. The replay client reads the top-level `instruction` dataset and sends it to the policy server as `obs["instruction"]`.
+Use `my_robot/replay_robot.py` with `example/deploy/replay_robot.yml` (copy and edit for your task). Point `hdf5_paths` to the **`data/`** subdirectory and set `hdf5_format: xspark`. The replay client reads the top-level `instruction` dataset and sends it to the policy server as `obs["instruction"]`.
 
 **Step 6 — Real-robot deployment**
 
@@ -129,7 +129,7 @@ Each `episode_{index:07d}.hdf5` contains:
 Repo helpers:
 
 - **`example/deploy/real_env_client.py`**: real-robot environment client
-- **`my_robot/replay_robot.py`** + **`config/replay_robot_*.yml`**: offline HDF5 replay
+- **`my_robot/replay_robot.py`** + **`example/deploy/replay_robot.yml`**: offline HDF5 replay
 - **`example/deploy/robot_client_server/`**: lightweight model client/server helpers
 - **`task_env/real_env_client.py`**: import shim for XPolicyLab robodojo
 - **`src/robot/utils/base/xpolicy_hdf5.py`**: metadata read/write/validate helpers

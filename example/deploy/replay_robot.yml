@@ -1,13 +1,14 @@
 INFO_LEVEL: INFO
-env_cfg_type: dual_piper
+# Replace with your XPolicyLab bench / robot profile when wiring real_env_client.
+env_cfg_type: YOUR_ENV_CFG
 
 collect:
-  task_name: dual_bottles_pick
+  task_name: YOUR_TASK
   type: replay
   save_dir: ./data
   save_format: hdf5
   start_episode: 0
-  num_episode: 100
+  num_episode: 1
   save_freq: 30
   move_check: false
   use_footpedal: false
@@ -15,10 +16,12 @@ collect:
 robot:
   type: replay_robot
   use_node: false
-  action_type: ee  # joint | ee
+  action_type: joint  # joint | ee
   skip_interval: 1
-  hdf5_paths: save/test_robot/
+  hdf5_format: xspark
+  # Path to the data/ directory containing episode_*.hdf5 (xspark layout).
+  hdf5_paths: data/YOUR_TASK/data/
   eval_num: 1
   shuffle: false
-  policy_name: demo_policy
+  policy_name: YOUR_POLICY
   save_path: save/eval/

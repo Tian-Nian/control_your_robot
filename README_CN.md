@@ -93,7 +93,7 @@ bash train.sh RoboDojo stack_bowls piper_x joint 0 0
 
 **步骤 5 — 离线评测（HDF5 replay）**
 
-使用 `my_robot/replay_robot.py` 与 `config/replay_robot_*.yml`。`hdf5_paths` 指向 **`data/`** 子目录，并设置 `hdf5_format: xspark`。Replay 从 HDF5 顶层 `instruction` 读取 prompt，以 `obs["instruction"]` 发给 policy server。
+使用 `my_robot/replay_robot.py` 与 `example/deploy/replay_robot.yml`（复制后按任务修改）。`hdf5_paths` 指向 **`data/`** 子目录，并设置 `hdf5_format: xspark`。Replay 从 HDF5 顶层 `instruction` 读取 prompt，以 `obs["instruction"]` 发给 policy server。
 
 **步骤 6 — 真机部署**
 
@@ -125,7 +125,7 @@ bash setup_eval_env_client.sh ...
 相关代码：
 
 - `example/deploy/real_env_client.py` — 真机环境客户端
-- `my_robot/replay_robot.py` + `config/replay_robot_*.yml` — 离线 HDF5 replay
+- `my_robot/replay_robot.py` + `example/deploy/replay_robot.yml` — 离线 HDF5 replay
 - `task_env/real_env_client.py` — XPolicyLab robodojo 导入 shim
 - `src/robot/utils/base/xpolicy_hdf5.py` — 元数据读写/校验
 

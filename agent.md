@@ -124,7 +124,7 @@ Training scripts expect xspark episodes with a non-empty top-level `instruction`
 ### 6. Offline evaluation
 
 - Driver: `my_robot/replay_robot.py`
-- Config: `config/replay_robot_*.yml`
+- Config: `example/deploy/replay_robot.yml` (generic template; copy and set `env_cfg_type`, `hdf5_paths`, etc.)
 - Set `hdf5_paths` to the **`data/`** directory containing `episode_*.hdf5`
 - Set `hdf5_format: xspark`
 - Replay reads `instruction` from each episode and passes it to the policy as `obs["instruction"]`
