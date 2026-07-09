@@ -1,0 +1,25 @@
+INFO_LEVEL: INFO
+env_cfg_type: dual_piper
+
+collect:
+  task_name: test_dual_piper
+  type: replay
+  save_dir: ./data
+  save_format: hdf5
+  start_episode: 0
+  num_episode: 1
+  save_freq: 30
+  move_check: false
+  use_footpedal: false
+
+robot:
+  type: replay_robot
+  use_node: false
+  action_type: joint
+  skip_interval: 1
+  hdf5_format: real
+  hdf5_paths: /home/server/project/niantian/control_your_robot/save/test_robot/
+  eval_num: 1
+  shuffle: false
+  policy_name: demo_policy
+  save_path: /home/server/project/niantian/control_your_robot/save/eval/

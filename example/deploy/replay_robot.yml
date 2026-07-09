@@ -1,0 +1,24 @@
+INFO_LEVEL: INFO
+env_cfg_type: dual_piper
+
+collect:
+  task_name: dual_bottles_pick
+  type: replay
+  save_dir: ./data
+  save_format: hdf5
+  start_episode: 0
+  num_episode: 100
+  save_freq: 30
+  move_check: false
+  use_footpedal: false
+
+robot:
+  type: replay_robot
+  use_node: false
+  action_type: ee  # joint | ee
+  skip_interval: 1
+  hdf5_paths: save/test_robot/
+  eval_num: 1
+  shuffle: false
+  policy_name: demo_policy
+  save_path: save/eval/

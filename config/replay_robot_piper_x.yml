@@ -1,0 +1,25 @@
+INFO_LEVEL: INFO
+env_cfg_type: piper_x
+
+collect:
+  task_name: test_piper_x
+  type: replay
+  save_dir: ./data
+  save_format: hdf5
+  start_episode: 0
+  num_episode: 1
+  save_freq: 30
+  move_check: false
+  use_footpedal: false
+
+robot:
+  type: replay_robot
+  use_node: false
+  action_type: joint
+  skip_interval: 1
+  hdf5_format: real
+  hdf5_paths: /mnt/nas/RoboDojo_Real/PIPER_X/001/build_LEGO_new_new/x-one-piperX-orbbec
+  eval_num: 1
+  shuffle: false
+  policy_name: Pi_05
+  save_path: /home/server/project/niantian/control_your_robot/save/eval/test_piper_x/
