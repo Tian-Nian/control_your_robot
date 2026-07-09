@@ -4,7 +4,155 @@
 [Chinese WIKI](https://tian-nian.github.io/control_your_robot-doc/)
 
 # 控制你的机器人!
-该项目旨在与帮助各位进入具身智能领域后能快速上手一整套从控制机械臂开始, 到数据采集, 到最终VLA模型的训练与部署的流程.
+
+该项目旨在与帮助各位进入具身智能领域后能快速上手一整套从控制机械臂开始, 到数据采集, 到最终 VLA 模型的训练与部署的流程.
+
+# 近期更新 (2026-07)
+
+本分支新增 [XPolicyLab](https://github.com/XPolicyLab/XPolicyLab) 部署支持、Xspark 数据转换、遥操作 IPC 优化，以及若干协议与命名修复。
+
+## XPolicyLab 接入
+
+上游项目：[XPolicyLab](https://github.com/XPolicyLab/XPolicyLab)
+
+### 端到端流程
+
+```
+control_your_robot 采集
+        ↓
+tools/transform2xspark.py          # 原始 HDF5 → xspark v1.0
+        ↓
+tools/write_xpolicy_instruction.py # 补写 instruction（转换时未写入则在此补充）
+        ↓
+复制/软链到 XPolicyLab 目录树      # data/{bench}/{task}/{env_cfg}/data/episode_*.hdf5
+        ↓
+XPolicyLab policy/<POLICY>/process_data.sh + train.sh
+        ↓
+离线 replay 评测 (ReplayRobot) 或 真机部署 (real_env_client)
+```
+
+**步骤 1 — 采集原始数据**
+
+```bash
+python example/collect/collect.py
+# 或遥操作：
+python example/teleop/master_slave_arm_teleop_fs.py
+```
+
+原始布局：`save/{task_name}/*.hdf5`，扁平 group（`left_arm/`、`cam_head/` 等）。
+
+**步骤 2 — 转换为 xspark v1.0**
+
+```bash
+python tools/transform2xspark.py save/test_robot \
+  --save-dir ./data \
+  --task-name stack_bowls \
+  --skip-video
+```
+
+输出布局：
+
+```
+data/stack_bowls/
+├── data/episode_0000000.hdf5
+├── preview_video/                 # 可选
+└── config.json
+```
+
+**步骤 3 — 语言指令（转换阶段可选）**
+
+`transform2xspark.py` 仅在找到以下指令来源时写入 `instruction` / `instructions`：
+
+- `--instruction` 显式指定
+- sidecar JSON（`0.json`、`info.json`）
+- `task_info/{task_name}.json` 或 `task_instructions/{task_name}.json`
+
+若均未找到，episode 仍会完成转换，但 **不写入 instruction 字段**，可后期补充：
+
+```bash
+python tools/write_xpolicy_instruction.py data/stack_bowls/data \
+  --task-name stack_bowls \
+  --verify
+```
+
+**步骤 4 — 放入 XPolicyLab 训练目录**
+
+```bash
+mkdir -p ../XPolicyLab/data/RoboDojo/stack_bowls/piper_x/data
+cp data/stack_bowls/data/episode_*.hdf5 ../XPolicyLab/data/RoboDojo/stack_bowls/piper_x/data/
+```
+
+随后按目标 policy 的 README 执行，例如：
+
+```bash
+cd ../XPolicyLab/policy/Pi_05
+bash install.sh
+bash process_data.sh RoboDojo stack_bowls piper_x joint
+bash train.sh RoboDojo stack_bowls piper_x joint 0 0
+```
+
+**步骤 5 — 离线评测（HDF5 replay）**
+
+使用 `my_robot/replay_robot.py` 与 `config/replay_robot_*.yml`。`hdf5_paths` 指向 **`data/`** 子目录，并设置 `hdf5_format: xspark`。Replay 从 HDF5 顶层 `instruction` 读取 prompt，以 `obs["instruction"]` 发给 policy server。
+
+**步骤 6 — 真机部署**
+
+分机部署流程见 XPolicyLab policy README：
+
+```bash
+# 策略机
+bash setup_eval_policy_server.sh ...
+
+# 机器人/采集端 — 通过 task_env shim 加载 example/deploy/real_env_client.py
+bash setup_eval_env_client.sh ...
+```
+
+协议：WebSocket，`client_server.ws.WsModelClient`（非旧版 `robodojo_ws`）。
+
+### xspark v1.0 episode 结构（XPolicyLab 兼容）
+
+| 位置 | 类型 | 说明 |
+|------|------|------|
+| `instruction` | UTF-8 字符串 | 训练/离线评测前必需；可后期补写 |
+| `instructions` | UTF-8 字符串数组 | 与 instruction 相同文本的单元素列表 |
+| `data_format_version` | `"v1.0"` | 轨迹协议版本 |
+| `additional_info/frequency` | int | 控制/采集频率（通常 25 或 30） |
+| `vision/{cam}/colors` | `(T,)` JPEG 字节 | 三路相机 |
+| `state/*_joint_states` | `(T, DOF)` | 关节 + 夹爪 |
+| `state/*_ee_poses` | `(T, 7)` | xyz + 四元数 **wxyz** |
+| `action/*` | 与 state 同名 | `action[t] = state[t+1]` |
+
+相关代码：
+
+- `example/deploy/real_env_client.py` — 真机环境客户端
+- `my_robot/replay_robot.py` + `config/replay_robot_*.yml` — 离线 HDF5 replay
+- `task_env/real_env_client.py` — XPolicyLab robodojo 导入 shim
+- `src/robot/utils/base/xpolicy_hdf5.py` — 元数据读写/校验
+
+## Xspark 数据管线
+
+- `X_spark_format_pipeline` — `src/robot/utils/base/data_transform_pipeline.py`
+- `tools/transform2xspark.py` — 批量 raw → xspark
+- `tools/write_xpolicy_instruction.py` — 补写/更新 instruction 与元数据
+- 兼容 legacy：`qpos` → `eef`，`slave_*_arm` → `left_arm` / `right_arm`
+- 加速：`--skip-video` 或 `XSPARK_SKIP_PREVIEW=1`
+
+```bash
+python tools/transform2xspark.py save/test_robot --save-dir ./data --skip-video
+python tools/write_xpolicy_instruction.py data/xspark/data --task-name xspark --verify
+```
+
+## 遥操作性能优化
+
+- `example/teleop/master_slave_arm_teleop_fs.py` 使用 **MsgpackSharedDict** 替代 `Manager().dict()`，避免高频 IPC 序列化开销
+- 进程优雅退出，避免 HDF5 写入中断
+- 依赖：`msgpack>=1.0.5`（见 `pyproject.toml` / `requirements.txt`）
+
+## 修复与重构
+
+- 末端位姿字段统一：**`qpos` → `eef`**
+- XPolicyLab 协议更新：**`robodojo_ws` → `ws`**
+- Agent 开发指南：**`agent.md`**
 
 ## 快速上手!
 由于本项目实现了部分测试样例, 如机械臂测试样例, 视觉模拟样例, 完整机器人模拟样例, 因此可以在没有任何实体的情况下快速了解本项目的整体框架.
@@ -66,8 +214,20 @@ python -m my_robot.test_robot
 
 6. 一些数据转化脚本
 ```bash
-# 在执行完python example/collect/collect.py, 路径下有轨迹后
+# 在执行完 python example/collect/collect.py, 路径下有轨迹后
 python scripts/convert2rdt_hdf5.py save/test_robot/ save/rdt/
+
+# Xspark + XPolicyLab 数据准备
+python tools/transform2xspark.py save/test_robot --save-dir ./data --skip-video
+python tools/write_xpolicy_instruction.py data/xspark/data --task-name xspark --verify
+```
+
+7. 遥操作采集（同频 / 异频）
+```bash
+# 同频
+python example/teleop/master_slave_arm_teleop.py
+# 异频（300Hz 控制 / 60Hz 采集，msgpack IPC）
+python example/teleop/master_slave_arm_teleop_fs.py
 ```
 
 ### 🤖 设备支持情况

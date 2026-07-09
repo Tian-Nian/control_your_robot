@@ -20,6 +20,7 @@ third_party/dr/
 execution_logs/
 output/
 data/check_data.json
+data/
 policy/weights
 realsense_captures/
 piper_scripts/
@@ -31,3 +32,4 @@ processed_data/*
 test/*
 policy/openpi/checkpoints/*
 policy/DP/checkpoints/*
+eval_results/
