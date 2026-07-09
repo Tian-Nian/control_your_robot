@@ -35,7 +35,7 @@ class RealmanController(ArmController):
             if teleop_setup:
                 self.robot.set_up(**teleop_setup)
         except:
-            debug_print(self.name, "Could not find Realman_IK in third_party, key[teleop_qpos] will not take effect.", "WARNING")
+            debug_print(self.name, "Could not find Realman_IK in third_party, key[teleop_eef] will not take effect.", "WARNING")
 
     def reset(self, start_angles):
         """Move robot to the specified start position"""

@@ -99,7 +99,7 @@ if __name__ == "__main__":
     time_lock_vision = Semaphore(0)
     time_lock_arm = Semaphore(0)
     vision_process = Process(target=ComponentWorker, args=("TestVisonSensor", "test_vision", None, ["color"], data_buffer, time_lock_vision, start_event, finish_event, "vision_worker"))
-    arm_process = Process(target=ComponentWorker, args=("TestArmController", "test_arm", None, ["joint", "qpos", "gripper"], data_buffer, time_lock_arm, start_event, finish_event, "arm_worker"))
+    arm_process = Process(target=ComponentWorker, args=("TestArmController", "test_arm", None, ["joint", "eef", "gripper"], data_buffer, time_lock_arm, start_event, finish_event, "arm_worker"))
     time_scheduler = TimeScheduler([time_lock_vision, time_lock_arm], time_freq=100) # 可以给多个进程同时上锁
     
     processes.append(vision_process)

@@ -55,7 +55,7 @@ class Y1Controller(ArmController):
         joint = self.controller.GetJointPosition()
         vel = self.controller.GetJointVelocity()
 
-        state["qpos"] = eef
+        state["eef"] = eef
         state["joint"] = joint[:6]
         state["gripper"] = joint[6] / 84
 

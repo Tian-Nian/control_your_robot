@@ -13,7 +13,7 @@ from robot.utils.worker.time_scheduler import TimeScheduler
 from robot.utils.worker.robot_worker import RobotWorker
 from robot.utils.base.data_handler import debug_print
 
-ARM_INFO_NAME = ["qpos", "gripper"]
+ARM_INFO_NAME = ["eef", "gripper"]
 
 condition = {
     "save_path": "./save/ckpt",
@@ -43,13 +43,13 @@ class PathCollector:
         for index, episode in enumerate(self.collecter.episode):
             episode_data = {"left_arm": {}, "right_arm": {}}
             print(episode.keys())
-            if isinstance(episode.get("left_arm", {}).get("qpos"), np.ndarray):
-                episode_data["left_arm"]["qpos"] = episode["left_arm"]["qpos"].tolist()
+            if isinstance(episode.get("left_arm", {}).get("eef"), np.ndarray):
+                episode_data["left_arm"]["eef"] = episode["left_arm"]["eef"].tolist()
             if isinstance(episode.get("left_arm", {}).get("gripper"), np.ndarray):
                 episode_data["left_arm"]["gripper"] = episode["left_arm"]["gripper"].tolist()
 
-            if isinstance(episode.get("right_arm", {}).get("qpos"), np.ndarray):
-                episode_data["right_arm"]["qpos"] = episode["right_arm"]["qpos"].tolist()
+            if isinstance(episode.get("right_arm", {}).get("eef"), np.ndarray):
+                episode_data["right_arm"]["eef"] = episode["right_arm"]["eef"].tolist()
             if isinstance(episode.get("right_arm", {}).get("gripper"), np.ndarray):
                 episode_data["right_arm"]["gripper"] = episode["right_arm"]["gripper"].tolist()
             
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     robot.set_up()
 
     # setting collect info
-    ARM_INFO_NAME = ["qpos", "gripper"]
+    ARM_INFO_NAME = ["eef", "gripper"]
 
     robot.set_collect_type({"arm":ARM_INFO_NAME, 
                            "image": []}) 

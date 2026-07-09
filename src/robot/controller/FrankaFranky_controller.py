@@ -59,7 +59,7 @@ class FrankaFrankyController(ArmController):
         # Get the self.controller's joint state
         joint_state = self.controller.current_joint_state
 
-        state["qpos"] = ee_pose
+        state["eef"] = ee_pose
         state["joint"] = joint_state
 
         return state

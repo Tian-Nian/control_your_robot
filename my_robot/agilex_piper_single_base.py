@@ -71,7 +71,7 @@ class PiperSingle(Robot):
         self.sensors["image"]["cam_head"].set_up(CAMERA_SERIALS["head"])
         self.sensors["image"]["cam_wrist"].set_up(CAMERA_SERIALS["wrist"])
 
-        self.set_collect_type({"arm": ["joint","qpos","gripper"],
+        self.set_collect_type({"arm": ["joint","eef","gripper"],
                                "image": ["color"]
                                })
         
@@ -95,7 +95,7 @@ if __name__=="__main__":
     move_data = {
         "arm":{
             "left_arm":{
-            "qpos":[0.057, 0.0, 0.216, 0.0, 0.085, 0.0],
+            "eef":[0.057, 0.0, 0.216, 0.0, 0.085, 0.0],
             "gripper":0.2,
             },
         },

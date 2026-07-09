@@ -52,7 +52,7 @@ class TestRobot(Robot):
         self.sensors["image"]["cam_head"].set_up(is_depth=False)
         self.sensors["image"]["cam_left_wrist"].set_up(is_depth=False)
         self.sensors["image"]["cam_right_wrist"].set_up(is_depth=False)
-        self.set_collect_type({"arm": ["joint","qpos","gripper"],
+        self.set_collect_type({"arm": ["joint","eef","gripper"],
                                "mobile": ["move_velocity", "position"],
                                "image": ["color"],
                                })
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     robot.finish()
 
     data_path = os.path.join(condition["save_path"], condition["task_name"], "0.hdf5")
-    robot.replay(data_path, key_banned=["qpos"], is_collect=True, episode_id=100)
+    robot.replay(data_path, key_banned=["eef"], is_collect=True, episode_id=100)
 
     move_data = {
         "arm":{

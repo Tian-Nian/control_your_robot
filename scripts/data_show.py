@@ -127,7 +127,7 @@ def parse_args():
         type=str,
         nargs="+",  # 接收一个或多个值
         required=False,
-        default=["qpos", "joint", "gripper"],
+        default=["eef", "joint", "gripper"],
         help="选项列表，空格分隔，例如 --option a b c"
     )
 
@@ -170,7 +170,7 @@ if __name__ == "__main__":
         paths = get_random_hdf5(path, 1)
     
     options = {
-                "qpos": {
+                "eef": {
                     "keys": ['x', 'y', 'z', 'rz', 'ry', 'rz'],
                 }, 
                "joint": {
@@ -190,7 +190,7 @@ if __name__ == "__main__":
 
     for p in paths:
         episode = read_hdf5(p)
-        t = np.linspace(0, len(episode["right_arm"]["qpos"])-1, len(episode["right_arm"]["qpos"]))
+        t = np.linspace(0, len(episode["right_arm"]["eef"])-1, len(episode["right_arm"]["eef"]))
         data = {}
         data = {'t': t}
         for opt in my_options:

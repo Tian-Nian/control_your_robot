@@ -369,10 +369,10 @@ def visualize_openpi_format(f, verbose=False):
     if 'observations' in f:
         obs_group = f['observations']
         
-        # 处理qpos（关节位置）
-        if 'qpos' in obs_group and len(obs_group['qpos']) > 0:
-            robot_data['qpos'] = obs_group['qpos'][:]
-            max_frames = max(max_frames, len(robot_data['qpos']))
+        # 处理eef（关节位置）
+        if 'eef' in obs_group and len(obs_group['eef']) > 0:
+            robot_data['eef'] = obs_group['eef'][:]
+            max_frames = max(max_frames, len(robot_data['eef']))
         
         # 处理qvel（关节速度）
         if 'qvel' in obs_group and len(obs_group['qvel']) > 0:

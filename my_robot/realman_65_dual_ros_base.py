@@ -72,7 +72,7 @@ class MyRobot(Robot):
         self.sensors["image"]["cam_left_wrist"].set_up(CAMERA_SERIALS['left_wrist'], is_depth=False)
         self.sensors["image"]["cam_right_wrist"].set_up(CAMERA_SERIALS['right_wrist'], is_depth=False)
         
-        self.set_collect_type({"arm": ["joint","qpos","gripper"],
+        self.set_collect_type({"arm": ["joint","eef","gripper"],
                                "iamge": ["color"]
                                })
         print("set up success!")
@@ -101,15 +101,15 @@ if __name__ == "__main__":
         print(robot.get()[0])
         time.sleep(0.1)
     
-    # qpos
+    # eef
     move_data = {
         "arm": {
             "left_arm": {
-                # "qpos":np.array([0.46, 0.156, 0.3, -2., 0.3 ,-1.87]),
+                # "eef":np.array([0.46, 0.156, 0.3, -2., 0.3 ,-1.87]),
                 "joint": np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
                 },
             "right_arm": {
-                # "qpos":np.array([0.40, -0.40, 0.11, -2.6, 1.0, 2.72]),
+                # "eef":np.array([0.40, -0.40, 0.11, -2.6, 1.0, 2.72]),
                 "joint": np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
                 },
         },
@@ -122,11 +122,11 @@ if __name__ == "__main__":
     move_data = {
         "arm": {
             "left_arm": {
-                # "qpos":np.array([0.46, 0.156, 0.3, -2., 0.3 ,-1.87]),
+                # "eef":np.array([0.46, 0.156, 0.3, -2., 0.3 ,-1.87]),
                 "joint": np.array([0.0, 0.0, 0.10, 0.10, 0.0, 0.0])
                 },
             "right_arm": {
-                # "qpos":np.array([0.40, -0.40, 0.11, -2.6, 1.0, 2.72]),
+                # "eef":np.array([0.40, -0.40, 0.11, -2.6, 1.0, 2.72]),
                 "joint": np.array([0.0, 0.0, 0.10, 0.10, 0.0, 0.0])
                 },
         }

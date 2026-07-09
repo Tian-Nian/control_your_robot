@@ -93,11 +93,11 @@ def main(args):
 
                 left_arm.create_dataset("joint", data=ep["left_arm"]["joint"][:])
                 left_arm.create_dataset("gripper", data=ep["left_arm"]["gripper"][:])
-                left_arm.create_dataset("qpos", data=ep["left_arm"]["qpos"][:])
+                left_arm.create_dataset("eef", data=ep["left_arm"]["eef"][:])
 
                 right_arm.create_dataset("joint", data=ep["right_arm"]["joint"][:])
                 right_arm.create_dataset("gripper", data=ep["right_arm"]["gripper"][:])
-                right_arm.create_dataset("qpos", data=ep["right_arm"]["qpos"][:])
+                right_arm.create_dataset("eef", data=ep["right_arm"]["eef"][:])
             else:
                 cam_head = root.create_group("cam_head")
                 cam_head.create_dataset("color", data=imgs["cam_high"])
@@ -113,11 +113,11 @@ def main(args):
 
                 left_arm.create_dataset("joint", data=ep["observations/left_arm"]["joint"][:])
                 left_arm.create_dataset("gripper", data=ep["observations/left_arm"]["gripper"][:])
-                left_arm.create_dataset("qpos", data=ep["observations/left_arm"]["qpos"][:])
+                left_arm.create_dataset("eef", data=ep["observations/left_arm"]["eef"][:])
 
                 right_arm.create_dataset("joint", data=ep["observations/right_arm"]["joint"][:])
                 right_arm.create_dataset("gripper", data=ep["observations/right_arm"]["gripper"][:])
-                right_arm.create_dataset("qpos", data=ep["observations/right_arm"]["qpos"][:])
+                right_arm.create_dataset("eef", data=ep["observations/right_arm"]["eef"][:])
 
         print(f"saved {dataset_path}")
 
