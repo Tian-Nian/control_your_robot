@@ -20,7 +20,7 @@ dependencies = [
     "keyboard",
     "pyyaml",
     "seaborn",
-    "seaborn",
+    "msgpack>=1.0.5",
 ]
 
 [project.urls]

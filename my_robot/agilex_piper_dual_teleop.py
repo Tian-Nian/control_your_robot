@@ -84,7 +84,7 @@ class PikaPiper(Robot):
         self.sensors["teleop"]["pika_left"].set_up("/pika_pose_l","/gripper_l/joint_states")
         self.sensors["teleop"]["pika_right"].set_up("/pika_pose_r","/gripper_r/joint_states")
 
-        self.set_collect_type({"arm":["joint","qpos"],
+        self.set_collect_type({"arm":["joint","eef"],
                               "image":["color"], 
                               "teleop":["end_pose"],
                               })
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     while True:
         data = robot.get()
         if data[1]["pika_left"]["end_pose"] is not None and data[1]["pika_right"]["end_pose"] is not None and\
-            data[0]["left_arm"]["qpos"] is not None and data[0]["left_arm"]["qpos"] is not None:
+            data[0]["left_arm"]["eef"] is not None and data[0]["left_arm"]["eef"] is not None:
             break
         else:
             time.sleep(0.1)
@@ -113,8 +113,8 @@ if __name__ == "__main__":
 
     time.sleep(3)
 
-    left_base_pose = data[0]["left_arm"]["qpos"]
-    right_base_pose = data[0]["right_arm"]["qpos"]
+    left_base_pose = data[0]["left_arm"]["eef"]
+    right_base_pose = data[0]["right_arm"]["eef"]
     
     # 遥操
     while True:
@@ -139,9 +139,9 @@ if __name__ == "__main__":
             move_data = {
                 "arm":{
                     "left_arm": {
-                        "qpos":l_data},
+                        "eef":l_data},
                     "right_arm": {
-                        "qpos":r_data},
+                        "eef":r_data},
                 }
             }
 

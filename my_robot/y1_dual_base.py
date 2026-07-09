@@ -71,7 +71,7 @@ class Y1Dual(Robot):
         self.sensors["image"]["cam_left_wrist"].set_up(CAMERA_SERIALS['left_wrist'], is_depth=False)
         self.sensors["image"]["cam_right_wrist"].set_up(CAMERA_SERIALS['right_wrist'], is_depth=False)
 
-        self.set_collect_type({"arm": ["joint","qpos","gripper"],
+        self.set_collect_type({"arm": ["joint","eef","gripper"],
                                "image": ["color"]
                                })
         
@@ -85,7 +85,7 @@ if __name__ == "__main__":
 
     robot.set_up(teleop=False)
     # time.sleep(2)
-    robot.replay("./save/test/0.hdf5", key_banned=["qpos"])
+    robot.replay("./save/test/0.hdf5", key_banned=["eef"])
     exit()
 
     # collection test

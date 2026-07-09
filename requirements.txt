@@ -5,3 +5,4 @@ pyrealsense2
 opencv-python
 keyboard
 pyyaml
+msgpack>=1.0.5

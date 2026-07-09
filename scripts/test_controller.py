@@ -15,7 +15,7 @@ if __name__ == "__main__":
 
     test_controller = TestArmController("test_arm",DoFs=6,INFO="DEBUG")
 
-    test_controller.set_collect_info(["joint","qpos","gripper"])
+    test_controller.set_collect_info(["joint","eef","gripper"])
 
     test_controller.set_up()
 

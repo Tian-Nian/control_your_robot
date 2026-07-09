@@ -129,7 +129,7 @@ class DrAlohaController(ArmController):
         for i in range(6):
             joint_rad.append((joint[i] / 180) * 3.1415926)
         state["joint"] = np.array(joint_rad)
-        # state["qpos"]=np.array(eef)
+        # state["eef"]=np.array(eef)
         state["gripper"]=gripper*0.001*50/0.5
 
         return state

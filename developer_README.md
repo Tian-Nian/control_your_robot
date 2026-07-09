@@ -22,13 +22,13 @@
 
 #### class arm_controller(controller):
 `get_arm_information()`:根据collet_info获取信息
-`move()`: 输入为字典, 对应不同操作(如joint, qpos, gripper)操作机械臂
+`move()`: 输入为字典, 对应不同操作(如joint, eef, gripper)操作机械臂
 ##### 继承该类需要实现的函数
 根据collect_info来决定, 不需要collect的函数是不会被调用  
 一定要实现:  
 `get_state()`  
 选择性实现:  
-"qpos": `set_position() `  
+"eef": `set_position() `  
 "joint": `set_joint()`  
 如果机械臂绑定了gripper就基于本类来获取信息, 也可以直接在继承类中绑定gripper  
 "gripper":`set_gripper()`,`get_gripper()` 

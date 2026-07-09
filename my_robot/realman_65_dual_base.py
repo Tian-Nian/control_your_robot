@@ -73,7 +73,7 @@ class MyRobot:
         self.sensors["image"]["cam_left_wrist"].set_up(CAMERA_SERIALS['left_wrist'], is_depth=False)
         self.sensors["image"]["cam_right_wrist"].set_up(CAMERA_SERIALS['right_wrist'], is_depth=False)
         
-        self.set_collect_type({"arm": ["joint","qpos","gripper"],
+        self.set_collect_type({"arm": ["joint","eef","gripper"],
                                "iamge": ["color"]
                                })
         print("set up success!")

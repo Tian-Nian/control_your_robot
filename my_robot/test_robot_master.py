@@ -57,7 +57,7 @@ class TestRobotMaster(Robot):
         self.controllers["arm"]["left_arm"].set_up()
         self.controllers["arm"]["right_arm"].set_up()
 
-        self.set_collect_type({"arm": ["joint","qpos","gripper"],
+        self.set_collect_type({"arm": ["joint","eef","gripper"],
                                })
     
     def is_start(self):
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     robot.finish()
 
     data_path = os.path.join(condition["save_path"], condition["task_name"], "0.hdf5")
-    robot.replay(data_path, key_banned=["qpos"], is_collect=True, episode_id=100)
+    robot.replay(data_path, key_banned=["eef"], is_collect=True, episode_id=100)
 
     move_data = {
         "arm":{

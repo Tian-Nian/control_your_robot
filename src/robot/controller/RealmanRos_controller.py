@@ -70,7 +70,7 @@ class RealmanRosController(ArmController):
         state_msg = self.controller["subscriber"].get_latest_data()
         state = {}
         state["joint"] = state_msg.joint if state_msg is not None else None
-        state["qpos"] = state_msg.Pose if state_msg is not None else None
+        state["eef"] = state_msg.Pose if state_msg is not None else None
         return state
         
     def set_joint(self, joint):

@@ -25,8 +25,8 @@ class TestArmController(ArmController):
         # randly return a vaild value  
         state["joint"] = np.random.rand(self.DoFs) * 3.1515926 if self.now_state == {} or "joint" not in self.now_state.keys() \
               else self.now_state["joint"]
-        state["qpos"] = np.random.rand(6) if self.now_state == {}  or "qpos" not in self.now_state.keys() \
-              else self.now_state["qpos"]
+        state["eef"] = np.random.rand(6) if self.now_state == {}  or "eef" not in self.now_state.keys() \
+              else self.now_state["eef"]
         state["gripper"] = np.random.rand(1) if self.now_state == {}  or "gripper" not in self.now_state.keys() \
               else self.now_state["gripper"]
         # debug_print(self.name, f"get state: \n {state}", self.INFO)
@@ -40,7 +40,7 @@ class TestArmController(ArmController):
         else:
             debug_print(self.name, f"set_position input size should be 6 -> EULER or 7 -> QUATERNION","ERROR")
         
-        self.now_state["qpos"] = position
+        self.now_state["eef"] = position
     
     def set_joint(self, joint):
         if joint.shape[0] != self.DoFs:
@@ -78,7 +78,7 @@ if __name__=="__main__":
     
     controller = TestArmController("test_arm",DoFs=6,INFO="DEBUG")
 
-    controller.set_collect_info(["joint","qpos","gripper"])
+    controller.set_collect_info(["joint","eef","gripper"])
 
     controller.set_up()
 

@@ -74,7 +74,7 @@ class PiperDual(Robot):
         self.sensors["image"]["cam_left_wrist"].set_up(CAMERA_SERIALS['left_wrist'], is_depth=False)
         self.sensors["image"]["cam_right_wrist"].set_up(CAMERA_SERIALS['right_wrist'], is_depth=False)
 
-        self.set_collect_type({"arm": ["joint","qpos","gripper"],
+        self.set_collect_type({"arm": ["joint","eef","gripper"],
                                "image": ["color"]
                                })
         print("set up success!")
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     move_data = {
         "arm":{
             "left_arm":{
-            "qpos":[0.057, 0.0, 0.216, 0.0, 0.085, 0.0, 0.057, 0.0, 0.216, 0.0, 0.085, 0.0],
+            "eef":[0.057, 0.0, 0.216, 0.0, 0.085, 0.0, 0.057, 0.0, 0.216, 0.0, 0.085, 0.0],
             "gripper":0.2,
             },
         }
@@ -108,7 +108,7 @@ if __name__ == "__main__":
     move_data = {
         "arm":{
             "left_arm":{
-            "qpos":[0.060, 0.0, 0.260, 0.0, 0.085, 0.0, 0.060, 0.0, 0.260, 0.0, 0.085, 0.0],
+            "eef":[0.060, 0.0, 0.260, 0.0, 0.085, 0.0, 0.060, 0.0, 0.260, 0.0, 0.085, 0.0],
             "gripper":0.2,
             },
         }
