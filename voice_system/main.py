@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import select
 import sys
 import threading
@@ -14,8 +15,14 @@ try:
     import termios
     import tty
     HAS_TTY = True
+    HAS_MSVCRT = False
 except ImportError:
     HAS_TTY = False
+    try:
+        import msvcrt
+        HAS_MSVCRT = True
+    except ImportError:
+        HAS_MSVCRT = False
 
 try:
     from dotenv import load_dotenv
@@ -47,6 +54,9 @@ EVENT_KEY_MAP = {
     "s": "start",
     "e": "end",
 }
+
+A_KEY_EVENTS = ["human_miss", "end", "defense_success", "ai_goal"]
+H_KEY_EVENT = "human_goal"
 
 
 class VoiceSystem:
@@ -85,6 +95,13 @@ class VoiceSystem:
     def trigger_event(self, event_type: str) -> None:
         """Trigger a game event: human_goal/ai_goal/human_miss/defense_success/idle/start/end."""
         self.state_machine.trigger_event(event_type)
+
+    def trigger_immediate_audio(self, event_type: str) -> None:
+        """Play a high-priority trash-talk audio immediately, interrupting current speech."""
+        logger.info("Immediate audio trigger event=%s", event_type)
+        self._speaking = True
+        self.tts.stop()
+        self.tts.speak_trash(event_type)
 
     def user_wake_up(self) -> None:
         """Enter chat mode after wake word detection."""
@@ -178,28 +195,42 @@ def _read_line(prompt: str) -> str:
 
 
 def _read_key(timeout: float = 0.05) -> Optional[str]:
-    """Read one key in cbreak mode, returning None on timeout."""
-    readable, _, _ = select.select([sys.stdin], [], [], timeout)
-    if not readable:
+    """Read one key in cbreak mode or via msvcrt, returning None on timeout."""
+    if HAS_TTY:
+        readable, _, _ = select.select([sys.stdin], [], [], timeout)
+        if not readable:
+            return None
+        return sys.stdin.read(1)
+
+    if HAS_MSVCRT:
+        start = time.monotonic()
+        while time.monotonic() - start < timeout:
+            if msvcrt.kbhit():
+                return msvcrt.getwch()
+            time.sleep(0.01)
         return None
-    return sys.stdin.read(1)
+
+    return None
 
 
 def run_keyboard_test() -> None:
     """Keyboard simulation mode for development without real game hardware."""
-    if not HAS_TTY:
-        logger.error("Keyboard test requires a Unix TTY (termios). Use --mode voice on Windows.")
+    if not HAS_TTY and not HAS_MSVCRT:
+        logger.error("Keyboard test requires a TTY or msvcrt keyboard input. Use --mode voice in production.")
         return
 
     configure_logging()
     system = VoiceSystem()
     logger.info("VoiceSystem keyboard test started")
-    logger.info("Keys: g human goal, G AI goal, m miss, d defense, i idle, c wake, q stop chat, h puck hit, t text, x exit")
-    logger.info("Press keys directly. For t, type text then Enter.")
+    logger.info("Keys: a random miss/end/defense/ai goal, h human goal, x exit")
+    logger.info("Press keys directly.")
 
-    old_tty = termios.tcgetattr(sys.stdin)
-    try:
+    old_tty = None
+    if HAS_TTY:
+        old_tty = termios.tcgetattr(sys.stdin)
         tty.setcbreak(sys.stdin.fileno())
+
+    try:
         while True:
             system.tick()
             key = _read_key(timeout=0.05)
@@ -208,27 +239,20 @@ def run_keyboard_test() -> None:
 
             if key == "x":
                 break
-            if key in EVENT_KEY_MAP:
-                system.trigger_event(EVENT_KEY_MAP[key])
-            elif key == "c":
-                system.user_wake_up()
-            elif key == "q":
-                system.user_say("别聊了")
+            if key == "a":
+                event_type = random.choice(A_KEY_EVENTS)
+                system.trigger_immediate_audio(event_type)
             elif key == "h":
-                system.puck_hit()
-            elif key == "t":
-                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
-                text = _read_line("你说：")
-                tty.setcbreak(sys.stdin.fileno())
-                system.user_say(text)
+                system.trigger_immediate_audio(H_KEY_EVENT)
             else:
-                logger.info("Unknown key: %s", key)
+                logger.debug("Keyboard test ignored key: %s", key)
 
             system.tick()
     except KeyboardInterrupt:
         logger.info("Keyboard test interrupted")
     finally:
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
+        if HAS_TTY and old_tty is not None:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
         system.shutdown()
 
 
@@ -309,15 +333,29 @@ def run_voice_mode() -> None:
     # --- Microphone setup ---
     mic = MicCapture(on_audio=asr_session.send_audio)
 
+    old_tty = None
+    if HAS_TTY:
+        old_tty = termios.tcgetattr(sys.stdin)
+        tty.setcbreak(sys.stdin.fileno())
+
     # --- Start ---
     logger.info("Starting voice mode (mic → ASR → VoiceSystem)")
-    logger.info("Speak to interact. Ctrl+C to exit.")
+    logger.info("Speak to interact. Press 'a' or 'h' or 'S' to trigger instant audio if supported. Ctrl+C to exit.")
     asr_session.start()
     mic.start()
+    system.trigger_immediate_audio("start")
 
     try:
         while True:
             system.tick()
+            key = _read_key(timeout=0.05)
+            if key == "a":
+                event_type = random.choice(A_KEY_EVENTS)
+                system.trigger_immediate_audio(event_type)
+            elif key == "h":
+                system.trigger_immediate_audio(H_KEY_EVENT)
+            elif key == "S":
+                system.trigger_immediate_audio("idle")
             time.sleep(0.05)
     except KeyboardInterrupt:
         logger.info("Voice mode interrupted")
@@ -326,6 +364,8 @@ def run_voice_mode() -> None:
         with _debounce_lock:
             if _debounce_timer[0] is not None:
                 _debounce_timer[0].cancel()
+        if HAS_TTY and old_tty is not None:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_tty)
         mic.stop()
         asr_session.stop()
         system.shutdown()
