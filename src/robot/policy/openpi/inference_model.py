@@ -5,7 +5,7 @@
 #!/usr/bin/python3
 """
 from pathlib import Path
-
+import sys
 # get current workspace
 current_file = Path(__file__)
 
@@ -73,6 +73,71 @@ class PI0_DUAL:
         else:
             imgs_array = img_arr
         
+        img_front, img_right, img_left, _ = imgs_array[0], imgs_array[1], imgs_array[2], state
+        img_front = np.transpose(img_front, (2, 0, 1))
+        img_right = np.transpose(img_right, (2, 0, 1))
+        img_left = np.transpose(img_left, (2, 0, 1))
+
+        self.observation_window = {
+            "state": state,
+            "images": {
+                "cam_high": img_front,
+                "cam_left_wrist": img_left,
+                "cam_right_wrist": img_right,
+            },
+            "prompt": self.instruction,
+        }
+
+    def get_action(self):
+        assert (self.observation_window is not None), "update observation_window first!"
+        return self.policy.infer(self.observation_window)["actions"]
+
+    def reset_obsrvationwindows(self):
+        self.instruction = None
+        self.observation_window = None
+        print("successfully unset obs and language intruction")
+
+class PI05_DUAL:
+    """PI0.5 model for dual-arm deployment (e.g., Piper dual arm)."""
+    def __init__(self, model_path, task_name):
+        self.task_name = task_name
+
+        train_config_name = "pi05_aloha_lora_base"
+        config = _config.get_config(train_config_name)
+        print("get config success!")
+        self.policy = _policy_config.create_trained_policy(config, model_path)
+        print("loading model success!")
+        self.img_size = (224, 224)
+        self.observation_window = None
+        self.random_set_language()
+
+    # set img_size
+    def set_img_size(self, img_size):
+        self.img_size = img_size
+
+    # set language randomly
+    def random_set_language(self):
+        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        json_Path = os.path.join(root_dir, "task_instructions", f"{self.task_name}.json")
+        with open(json_Path, 'r') as f_instr:
+            instruction_dict = json.load(f_instr)
+        instructions = instruction_dict['instructions']
+        instruction = np.random.choice(instructions)
+        self.instruction = instruction
+        print(f"successfully set instruction:{instruction}")
+
+    # Update the observation window buffer
+    def update_observation_window(self, img_arr, state):
+        imgs_array = []
+
+        if isinstance(img_arr[0], bytes):
+            for data in img_arr:
+                jpeg_bytes = np.array(data).tobytes().rstrip(b"\0")
+                nparr = np.frombuffer(jpeg_bytes, dtype=np.uint8)
+                imgs_array.append(cv2.imdecode(nparr, 1))
+        else:
+            imgs_array = img_arr
+
         img_front, img_right, img_left, _ = imgs_array[0], imgs_array[1], imgs_array[2], state
         img_front = np.transpose(img_front, (2, 0, 1))
         img_right = np.transpose(img_right, (2, 0, 1))

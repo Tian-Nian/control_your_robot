@@ -1,0 +1,94 @@
+robot:
+  robot_name: "Panthera-HT"
+  Serial_Type: "/dev/ttyACM"
+  Seial_baudrate: 4000000
+  motor_timeout_ms: 0  # 设置电机的超时时间（单位：毫秒），取值范围：[0, 32760]，如果电机在指定时间内未接收到新的控制指令，将进入阻尼模式。将此值设为0表示禁用超时时间功能。
+  canport_error_output_flag: false  # 设置是否启用CAN端口错误输出标志。启用后，当CAN端口发生错误时，系统将输出错误信息以便调试和诊断问题。
+  board_special_flag: false  # 设置是否启用特殊的板卡标志。启用后，系统将根据特定的板卡配置进行操作，适用于某些特殊用途或定制化的硬件设置。
+  exit_motor_brake_flag: true  # 设置是否启用退出电机刹车标志。启用后，当系统退出时，电机将自动释放刹车状态，允许自由运动。
+  CANboard_num: 1
+  CANboard:
+    No_1_CANboard:
+      CANport_num: 1
+      CANport:
+        CANport_1:
+          serial_id: 2
+          motor_num: 7
+          motor:
+            motor1:
+              type: "5047_36"
+              id: 1
+              name: "joint1"
+              num: 1
+              pos_limit_enable: false
+              pos_upper: 5
+              pos_lower: -5
+              tor_limit_enable: false
+              tor_upper: 5
+              tor_lower: -3
+            motor2:
+              type: "6056_36"
+              id: 2
+              name: "joint2"
+              num: 2
+              pos_limit_enable: false
+              pos_upper: 5
+              pos_lower: -5
+              tor_limit_enable: false
+              tor_upper: 5
+              tor_lower: -3
+            motor3:
+              type: "6056_36"
+              id: 3
+              name: "joint3"
+              num: 3
+              pos_limit_enable: false
+              pos_upper: 5
+              pos_lower: -5
+              tor_limit_enable: false
+              tor_upper: 5
+              tor_lower: -3
+            motor4:
+              type: "5047_36"
+              id: 4
+              name: "joint4"
+              num: 4
+              pos_limit_enable: false
+              pos_upper: 5
+              pos_lower: -5
+              tor_limit_enable: false
+              tor_upper: 5
+              tor_lower: -3
+            motor5:
+              type: "4438_30"
+              id: 5
+              name: "joint5"
+              num: 5
+              pos_limit_enable: false
+              pos_upper: 5
+              pos_lower: -5
+              tor_limit_enable: false
+              tor_upper: 5
+              tor_lower: -3
+            motor6:
+              type: "4438_30"
+              id: 6
+              name: "joint6"
+              num: 6
+              pos_limit_enable: false
+              pos_upper: 5
+              pos_lower: -5
+              tor_limit_enable: false
+              tor_upper: 5
+              tor_lower: -3
+            motor7:
+              type: "3536_32"
+              id: 7
+              name: "joint7"
+              num: 7
+              pos_limit_enable: false
+              pos_upper: 5
+              pos_lower: -5
+              tor_limit_enable: false
+              tor_upper: 5
+              tor_lower: -3

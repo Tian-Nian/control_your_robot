@@ -44,9 +44,9 @@ class RealsenseSensor(VisionSensor):
             self.config.enable_device(serial)
             # self.config.disable_all_streams()
             # Enable color stream only
-            self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+            self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 60)
             if is_depth:
-                self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+                self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 60)
             
             # Start streaming
             try:
@@ -95,11 +95,11 @@ class RealsenseSensor(VisionSensor):
 
 if __name__ == "__main__":
     cam = RealsenseSensor("test")
-    cam.set_up("419522071856")
+    cam.set_up("338622074268")
     cam.set_collect_info(["color"])
     cam_list = []
-    for i in range(1000):
+    for i in range(100):
         print(i)
         data = cam.get_image()
         cam_list.append(data)
-        time.sleep(0.1)
+        time.sleep(1/30)

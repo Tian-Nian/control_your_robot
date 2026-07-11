@@ -28,7 +28,7 @@ import argparse
 from pathlib import Path
 import base64
 from io import BytesIO
-
+import sys
 # 添加项目根目录到Python路径
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)

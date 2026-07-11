@@ -1,0 +1,3 @@
+robot:
+  robot_name: "HI"
+  param_file: "motor_1.yaml"

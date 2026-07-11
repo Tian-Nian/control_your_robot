@@ -1,0 +1,26 @@
+robot:
+  robot_name: "Single_Motor"
+  Serial_Type: "/dev/ttyACM"
+  Seial_baudrate: 4000000
+  motor_timeout_ms: 0  # 设置电机的超时时间（单位：毫秒），取值范围：[0, 32760]，如果电机在指定时间内未接收到新的控制指令，将进入阻尼模式。将此值设为0表示禁用超时时间功能。
+  CANboard_num: 1
+  CANboard:
+    No_1_CANboard:
+      CANport_num: 1
+      CANport:
+        CANport_1:
+          serial_id: 1
+          motor_num: 1
+          motor:
+            motor1:
+              type: "5047_36"
+              id: 1
+              name: "L_low_foot"
+              num: 1
+              pos_limit_enable: false
+              pos_upper: 5
+              pos_lower: -5
+              tor_limit_enable: false
+              tor_upper: 5
+              tor_lower: -3
+
