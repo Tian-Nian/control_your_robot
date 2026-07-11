@@ -50,7 +50,7 @@ class ChatEngine:
 
     def __init__(
         self,
-        api_key: Optional[str] = "sk-8da4c3a2810b42328fc4594aca7e5937",
+        api_key: Optional[str] = "your key",
         api_base: str = "https://api.deepseek.com",
         model: str = "deepseek-chat",
         timeout: float = 8.0,
