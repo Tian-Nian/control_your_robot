@@ -10,7 +10,7 @@ import time
 from robot.runtime.config import RuntimeConfig
 from robot.runtime.discover import remove_record, write_record
 from robot.runtime.log import configure_logging, get_logger
-from robot.runtime.node import component_process
+from robot.runtime.node import bundle_process
 from robot.runtime.transport import Bus, SlotSpec
 
 
@@ -37,15 +37,17 @@ def run_supervisor(config: RuntimeConfig) -> int:
                 [SlotSpec(item.name, item.max_bytes) for item in config.components],
                 config.cmd_capacity,
             )
-            for component in config.components:
+            for group in process_groups(config.components):
+                specs = [item.as_spec() for item in group]
+                label = "+".join(item.name for item in group)
                 process = ctx.Process(
-                    target=component_process,
-                    name=f"cyr-{component.name}",
-                    args=(config.shm_name, component.as_spec(), stop_event),
+                    target=bundle_process,
+                    name=f"cyr-{label}",
+                    args=(config.shm_name, specs, stop_event),
                 )
                 process.start()
                 processes.append(process)
-                log.info("拉起 %s pid=%s", component.name, process.pid)
+                log.info("拉起 %s pid=%s", label, process.pid)
             if not _wait_until_ready(bus, config, processes, stop_event, log):
                 if stop_event.is_set():
                     exit_code = 0
@@ -90,6 +92,24 @@ def run_supervisor(config: RuntimeConfig) -> int:
             bus.unlink()
         log.info("已关闭 exit=%s", exit_code)
     return exit_code
+
+
+def process_groups(components):
+    """同一台天机控制器的左右臂放进一个进程，才能共用那一条 UDP。"""
+    groups = []
+    shared: dict[str, list] = {}
+    for item in components:
+        robot_ip = (item.setup or {}).get("robot_ip") if item.class_name == "MarvinArmController" else None
+        if not robot_ip:
+            groups.append([item])
+            continue
+        bucket = shared.get(robot_ip)
+        if bucket is None:
+            bucket = []
+            shared[robot_ip] = bucket
+            groups.append(bucket)
+        bucket.append(item)
+    return groups
 
 
 def _wait_until_ready(bus: Bus, config: RuntimeConfig, processes: list[mp.Process], stop_event, log) -> bool:

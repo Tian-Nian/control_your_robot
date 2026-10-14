@@ -1,167 +1,102 @@
 # Agent Guide — control_your_robot
 
-This file orients coding agents to the repo layout, conventions, and the most common end-to-end workflows.
+This branch is a shared-memory robot runtime. Devices run in child processes. Agents attach to a running service and talk to components by name.
 
 ## Project purpose
 
-`control_your_robot` is a robotics data + deployment stack:
+`cyr` starts the service, publishes each component's latest observation, and accepts fire-and-forget commands. The runtime core does not import concrete drivers. The class path lives in YAML and is loaded inside the child process.
 
-- **Collect** teleop / scripted episodes to HDF5
-- **Transform** raw HDF5 to XPolicyLab xspark v1.0
-- **Deploy** VLA policies on replay or real hardware via [XPolicyLab](https://github.com/XPolicyLab/XPolicyLab)
-
-Hardware is optional: `my_robot/test_robot.py` and `TestArmController` / `TestVisonSensor` run without real devices.
+Hardware is optional. `config/runtime/test_robot.yml` uses in-process test devices. `config/runtime/marvin_lab.yml` is the Marvin lab bench.
 
 ## Layout
 
 | Path | Role |
 |------|------|
-| `src/robot/controller/` | Arm / mobile / hand controllers |
-| `src/robot/sensor/` | Cameras and other sensors |
-| `src/robot/data/collect_any.py` | Generic HDF5 collector |
-| `src/robot/utils/base/data_transform_pipeline.py` | Post-write pipelines (`X_spark_format_pipeline`) |
-| `src/robot/utils/base/xpolicy_hdf5.py` | XPolicyLab metadata read/write/validate |
-| `src/robot/utils/worker/` | Multiprocess workers + `MsgpackSharedDict` IPC |
-| `my_robot/` | Robot compositions (`test_robot`, `replay_robot`, piper/realman/y1) |
-| `example/collect/` | Data collection entry points |
-| `example/deploy/` | Deployment (`real_env_client.py`, `robot_client_server/`) |
-| `example/teleop/` | Master–slave teleop |
-| `tools/transform2xspark.py` | Raw HDF5 → xspark layout + metadata (when instruction provided) |
-| `tools/write_xpolicy_instruction.py` | Patch instruction/metadata on existing xspark HDF5 |
-| `task_env/` | Shim re-export for XPolicyLab `robodojo` imports |
+| `src/robot/runtime/` | Shared-memory bus, supervisor, session API, `cyr` CLI, HMI |
+| `src/robot/controller/` | Motion devices. `class_path` under `robot.controller` accepts commands |
+| `src/robot/sensor/` | Observation devices. Commands sent to them are dropped |
+| `config/runtime/` | Service configs |
+| `third_party/` | Vendor SDKs that stay in-tree |
+
+There is no `my_robot/`, `example/`, `tools/`, or `task_env/` on this branch. Do not recreate the old collect / deploy stack unless asked.
 
 ## Conventions
 
-- **End-effector field**: use `eef`, not legacy `qpos`.
-- **Collect config**: `save_path`, `task_name`, `save_format`, `save_freq`.
-- **CollectAny API**: `CollectAny(condition=..., move_check=..., resume=...)`.
-- **Debug levels**: `INFO_LEVEL` = `DEBUG` | `INFO` | `ERROR`.
-- **Teleop IPC**: prefer `MsgpackSharedDict` over `Manager().dict()`.
+- End-effector field is `eef`: xyz in meters plus quaternion **wxyz**.
+- Joint commands are radians, in the same order `get()` publishes.
+- A command is accepted when the node has popped it. That is not the same as the device having reached the pose.
+- `class_path` containing `.sensor.` does not accept commands. Controllers do.
+- Debug level: `INFO_LEVEL` = `DEBUG` | `INFO` | `ERROR`.
+- Do not commit `Log/`, `save/`, `data/`, or device logs.
 
-## XPolicyLab workflow
+## Runtime
 
-Repo: [https://github.com/XPolicyLab/XPolicyLab](https://github.com/XPolicyLab/XPolicyLab)
+- One latest-value shared-memory segment per service. Values are `msgpack_numpy`.
+- One process per component, except Marvin arms that share `robot_ip`. Those run in one process so they share one UDP socket.
+- Observations are each component's latest frame plus `timestamp_ns`. There is no cross-component sync.
+- Commands are a ring of 8. When it is full, the oldest command is dropped.
+- An abnormal component exit or a failed motion command latches safety, safe-stops the other devices, rejects later commands, and shuts the service down. Read failures stay soft.
+- Discovery record: `$XDG_STATE_HOME/cyr/runtime.json` (default `~/.local/state/cyr/runtime.json`). Logs: `cyr.log`, device stdout in `driver.log`.
 
-### 1. Collect
+## Config
 
-```bash
-python example/collect/collect.py
-python example/teleop/master_slave_arm_teleop_fs.py
-```
+Top-level keys: `name`, `shm_name`, `cmd_capacity` (default 8), `components`.
 
-Raw HDF5 groups: `left_arm`, `right_arm`, `cam_head`, ...
+Component keys: `name`, `class_path`, `class_name`, `args`, `setup`, `publish`, `rate_hz`, `max_bytes`. Unknown keys are rejected. Control parameters belong in `setup`, which is passed to `set_up(**setup)`.
 
-### 2. Convert to xspark v1.0
+## CLI
 
-```bash
-python tools/transform2xspark.py save/test_robot \
-  --save-dir ./data \
-  --task-name my_task \
-  --instruction "Pick up the red block." \
-  --skip-video
-```
-
-Writes:
-
-```
-data/my_task/data/episode_0000000.hdf5
-```
-
-When `xpolicy_instruction` is resolved, the pipeline also writes:
-
-- `instruction` (UTF-8 string)
-- `instructions` (UTF-8 string array, one element)
-
-If no instruction is found in `task_info`, sidecars, or `--instruction`, these keys are **skipped**. The pipeline still writes:
-
-- `data_format_version = "v1.0"`
-- `additional_info/frequency` (from `save_freq`, default 25)
-
-Instruction resolution order (first match wins):
-
-1. `--instruction`
-2. sidecar JSON (`0.json`, `info.json`)
-3. `task_info/{task_name}.json` or `task_instructions/{task_name}.json`
-
-### 3. Patch metadata (optional)
+Install this repo into the environment you use to run `cyr` (`pip install -e .`). `/usr/bin/cyr` on Debian is unrelated.
 
 ```bash
-python tools/write_xpolicy_instruction.py data/my_task/data \
-  --task-name my_task \
-  --frequency 25 \
-  --verify
+cyr start --config config/runtime/test_robot.yml
+cyr status
+cyr snapshot
+cyr echo left_arm
+cyr call left_arm '{"joint":[0,0,0,0,0,0]}'
+cyr call left_arm '{"op":"reset"}'
+cyr hmi
+cyr stop
 ```
 
-Skipped episodes (no instruction source found) are left unchanged.
+`cyr snapshot` and `cyr call` print one JSON line. `call` exits 0 only when the command was accepted. `hmi` does not start the service. `q` leaves the UI. `x` then `y` stops the service.
 
-### 4. Install into XPolicyLab data tree
+## Session API
 
-Target layout:
+```python
+from robot.runtime.session import Session
 
+session = Session.attach()
+session.describe()
+session.snapshot()
+session.call("left_arm", {"joint": [0, 0, 0, 0, 0, 0]})
+session.reset("left_arm")
+session.close()
 ```
-XPolicyLab/data/{bench_name}/{task_name}/{env_cfg_type}/data/episode_0000000.hdf5
-```
 
-Example:
+`snapshot` summarizes images as shape, dtype, and nbytes. It does not inline pixel buffers.
+
+## Marvin lab
+
+`config/runtime/marvin_lab.yml`, shared memory `cyr_marvin_lab`.
+
+| Name | Kind | Notes |
+|------|------|--------|
+| `left_arm`, `right_arm` | Marvin controller | Same `192.168.1.190`, arms A and B, one process. Default `control_mode: impedance` with the deploy K/D, vel/acc 50, and per-arm `tool_dyn`. `{"control_mode":"position"}` switches to joint position mode. `reset` goes to the deploy home joints. Safety stop holds the current feedback and does not disable. |
+| `left_hand`, `right_hand` | Wuji Hand 2 controller | UDP `192.168.1.110:7447` and `192.168.1.111:7447`. Twenty joints in the published model order. The hand streams the latest goal at `rate_hz`; each tick moves at most `max_joint_step_rad` (0.08). Safety stop disables the hand. |
+| `left_glove`, `right_glove` | Moxian sensor | `/dev/moxian_left`, `/dev/moxian_right`. Publishes raw `pressure`. |
+| `cam_head`, `cam_left_wrist`, `cam_right_wrist` | Orbbec sensor | Color only. |
+
+Wuji SDK: if the current env is not `xone_new`, the hand process loads that env's `wuji-sdk`. Override with `CYR_WUJI_SITE`. Marvin SDK root: `MARVIN_SDK_ROOT`, otherwise the sibling `X-Robot-Pipeline_deploy` checkout.
+
+Send absolute `joint` targets at or below the component `rate_hz`. A faster burst can queue up to 8 commands; each one takes its own step before the next replaces the goal.
+
+## Tests
+
+From the repo root:
 
 ```bash
-cp data/my_task/data/episode_*.hdf5 \
-  ../XPolicyLab/data/RoboDojo/my_task/piper_x/data/
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /path/to/venv/bin/python -m pytest src/robot/runtime/tests -q --tb=line
 ```
 
-### 5. Train in XPolicyLab
-
-Follow the policy README under `XPolicyLab/policy/<POLICY>/`:
-
-```bash
-bash install.sh
-bash process_data.sh <bench> <task> <env_cfg> <action_type>
-bash train.sh <bench> <task> <env_cfg> <action_type> <seed> <gpu>
-```
-
-Training scripts expect xspark episodes with a non-empty top-level `instruction` (or `instructions`).
-
-### 6. Offline evaluation
-
-- Driver: `my_robot/replay_robot.py`
-- Config: `example/deploy/replay_robot.yml` (generic template; copy and set `env_cfg_type`, `hdf5_paths`, etc.)
-- Set `hdf5_paths` to the **`data/`** directory containing `episode_*.hdf5`
-- Set `hdf5_format: xspark`
-- Replay reads `instruction` from each episode and passes it to the policy as `obs["instruction"]`
-
-### 7. Real-robot deployment
-
-- Robot-side client: `example/deploy/real_env_client.py`
-- Import shim: `task_env/real_env_client.py`
-- Protocol: `client_server.ws.WsModelClient` (`protocol: ws` in deploy.yml)
-- Use XPolicyLab `setup_eval_policy_server.sh` + `setup_eval_env_client.sh` for split-machine runs
-
-## xspark v1.0 fields
-
-Core trajectory groups are always written by `transform2xspark.py`. Instruction fields are **optional during convert** and **required before training / offline eval** (use `--verify` after patching):
-
-```
-instruction              # optional at convert; required before train/eval
-instructions
-data_format_version
-additional_info/frequency
-vision/...
-state/...
-action/...
-```
-
-EE pose layout: xyz + quaternion **wxyz**. Action tensors are next-state shifted from state.
-
-## Common commands
-
-```bash
-pip install -r requirements.txt
-python -m my_robot.test_robot
-python tools/transform2xspark.py save/test_robot --save-dir ./data --skip-video
-python tools/write_xpolicy_instruction.py data/xspark/data --task-name xspark --verify
-```
-
-## Commit hygiene
-
-- Keep diffs scoped; match existing naming and import style.
-- Do not commit `save/`, `data/`, checkpoints, or NAS paths.
+Do not use a Python that auto-loads ROS pytest plugins.

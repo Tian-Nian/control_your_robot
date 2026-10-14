@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -30,6 +31,14 @@ def main(argv: list[str] | None = None) -> int:
     echo_parser = sub.add_parser("echo", help="打印一个组件的最新观测")
     echo_parser.add_argument("component")
 
+    sub.add_parser("snapshot", help="打印全部组件的最新观测，一行 JSON")
+
+    call_parser = sub.add_parser("call", help="向一个组件发送一条命令，一行 JSON")
+    call_parser.add_argument("component")
+    call_parser.add_argument("data", help="JSON 对象，复位用 {\"op\":\"reset\"}")
+    call_parser.add_argument("--delta", action="store_true", help="把命令当成增量")
+    call_parser.add_argument("--timeout", type=float, default=2.0)
+
     args = parser.parse_args(argv)
     if args.command == "serve":
         return serve(Path(args.config))
@@ -47,8 +56,55 @@ def main(argv: list[str] | None = None) -> int:
         return run_hmi()
     if args.command == "echo":
         return echo(args.component)
+    if args.command == "snapshot":
+        return snapshot()
+    if args.command == "call":
+        return call(args.component, args.data, is_delta=args.delta, timeout=args.timeout)
     parser.error(f"unknown command {args.command}")
     return 2
+
+
+def snapshot() -> int:
+    from robot.runtime.session import Session
+
+    try:
+        session = Session.attach()
+    except RuntimeError as exc:
+        _print_json({"error": str(exc)})
+        return 1
+    try:
+        _print_json(session.snapshot())
+    finally:
+        session.close()
+    return 0
+
+
+def call(component: str, payload: str, *, is_delta: bool, timeout: float) -> int:
+    from robot.runtime.session import Session
+
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        _print_json({"accepted": False, "seq": None, "error": f"JSON 无效: {exc}", "state": None})
+        return 1
+    if not isinstance(data, dict):
+        _print_json({"accepted": False, "seq": None, "error": "命令必须是 JSON 对象", "state": None})
+        return 1
+    try:
+        session = Session.attach()
+    except RuntimeError as exc:
+        _print_json({"accepted": False, "seq": None, "error": str(exc), "state": None})
+        return 1
+    try:
+        result = session.call(component, data, is_delta=is_delta, timeout=timeout)
+    finally:
+        session.close()
+    _print_json(result)
+    return 0 if result["accepted"] else 1
+
+
+def _print_json(payload: dict) -> None:
+    print(json.dumps(payload, ensure_ascii=False), flush=True)
 
 
 def echo(component: str) -> int:

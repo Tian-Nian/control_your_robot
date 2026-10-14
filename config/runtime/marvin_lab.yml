@@ -1,0 +1,111 @@
+name: marvin_lab
+shm_name: cyr_marvin_lab
+cmd_capacity: 8
+components:
+  - name: left_arm
+    class_path: robot.controller.Marvin_arm_controller
+    class_name: MarvinArmController
+    args: {}
+    setup:
+      robot_ip: 192.168.1.190
+      side: left
+      arm_id: A
+      control_mode: impedance
+      joint_K: [16.0, 16.0, 16.0, 8.0, 8.0, 8.0, 8.0]
+      joint_D: [1.8, 1.8, 1.8, 1.8, 1.8, 1.8, 1.8]
+      vel_ratio: 50
+      acc_ratio: 50
+      tool_dyn: [0.919, 9.783, 12.470, 91.993, 0.006, 0.0, 0.0, 0.029, 0.0, 0.0]
+    publish: [joint, eef, control_mode]
+    rate_hz: 50
+    max_bytes: 65536
+  - name: right_arm
+    class_path: robot.controller.Marvin_arm_controller
+    class_name: MarvinArmController
+    args: {}
+    setup:
+      robot_ip: 192.168.1.190
+      side: right
+      arm_id: B
+      control_mode: impedance
+      joint_K: [16.0, 16.0, 16.0, 8.0, 8.0, 8.0, 8.0]
+      joint_D: [1.8, 1.8, 1.8, 1.8, 1.8, 1.8, 1.8]
+      vel_ratio: 50
+      acc_ratio: 50
+      tool_dyn: [0.930, 6.574, -8.853, 84.767, 0.021, 0.0, 0.0, 0.008, 0.0, 0.0]
+    publish: [joint, eef, control_mode]
+    rate_hz: 50
+    max_bytes: 65536
+  - name: left_hand
+    class_path: robot.controller.WujiHand_controller
+    class_name: WujiHandController
+    args: {}
+    setup:
+      side: left
+      address: 192.168.1.110:7447
+      kp: 3.0
+      kd: 0.1
+      effort_limit: 1.5
+      max_joint_step_rad: 0.08
+    publish: [joint]
+    rate_hz: 50
+    max_bytes: 65536
+  - name: right_hand
+    class_path: robot.controller.WujiHand_controller
+    class_name: WujiHandController
+    args: {}
+    setup:
+      side: right
+      address: 192.168.1.111:7447
+      kp: 3.0
+      kd: 0.1
+      effort_limit: 1.5
+      max_joint_step_rad: 0.08
+    publish: [joint]
+    rate_hz: 50
+    max_bytes: 65536
+  - name: left_glove
+    class_path: robot.sensor.MoxianTactile_sensor
+    class_name: MoxianTactileSensor
+    args: {}
+    setup:
+      device: /dev/moxian_left
+    publish: [pressure]
+    rate_hz: 50
+    max_bytes: 65536
+  - name: right_glove
+    class_path: robot.sensor.MoxianTactile_sensor
+    class_name: MoxianTactileSensor
+    args: {}
+    setup:
+      device: /dev/moxian_right
+    publish: [pressure]
+    rate_hz: 50
+    max_bytes: 65536
+  - name: cam_head
+    class_path: robot.sensor.Orbbec_sensor
+    class_name: OrbbecSensor
+    args: {}
+    setup:
+      serial: CP96563000WC
+    publish: [color]
+    rate_hz: 15
+    max_bytes: 2097152
+  - name: cam_left_wrist
+    class_path: robot.sensor.Orbbec_sensor
+    class_name: OrbbecSensor
+    args: {}
+    setup:
+      serial: CV2T6610008D
+    publish: [color]
+    rate_hz: 15
+    max_bytes: 2097152
+  - name: cam_right_wrist
+    class_path: robot.sensor.Orbbec_sensor
+    class_name: OrbbecSensor
+    args: {}
+    setup:
+      serial: CV2L36000031
+    publish: [color]
+    rate_hz: 15
+    max_bytes: 2097152
