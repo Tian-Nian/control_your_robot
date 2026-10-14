@@ -38,6 +38,10 @@ class TestMobileController(MobileController):
     def get_move_velocity(self):
         return self.velocity
 
+    def apply_reset(self, start_state):
+        self.velocity = np.zeros(6)
+        self.position = np.zeros(6) if start_state is None else np.asarray(start_state, dtype=float)
+
     def __del__(self):
         try:
             if hasattr(self, 'controller'):

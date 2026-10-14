@@ -25,12 +25,13 @@ class PiperController(ArmController):
         enable_fun(piper=piper)
         self.controller = piper
 
-    def reset(self, start_state):
+    def apply_reset(self, start_state):
+        if start_state is None:
+            start_state = np.zeros(6)
         try:
-            self.set_joint(start_state)
-        except :
-            print(f"reset error")
-        return
+            self.set_joint(np.asarray(start_state, dtype=float))
+        except Exception:
+            print("reset error")
 
     # 返回单位为米
     def get_state(self):

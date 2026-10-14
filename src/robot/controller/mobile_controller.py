@@ -41,6 +41,11 @@ class MobileController(Controller):
     def get_position(self) -> np.ndarray:
         pass
 
+    def apply_reset(self, start_state):
+        self.move({"move_velocity": np.zeros(6)})
+        if start_state is not None:
+            self.move({"move_to": np.asarray(start_state, dtype=float)})
+
     def set_up(self):
         pass
 

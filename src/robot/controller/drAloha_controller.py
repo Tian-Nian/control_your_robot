@@ -111,10 +111,7 @@ class DrAlohaController(ArmController):
             return True
     def zero_gravity(self):
         self.controller.set_torques(id_list=[1,2,3,4,5,6,7], torque_list=[0, 0, 0, 0, 0, 0, 0], param=0, mode=0) # 设置对应关节扭矩
-    def reset(self, start_state):
-        # 调用set_position或set_joint就行
-        pass
-    
+
     # 返回单位为米
     def get_state(self):
         state = {}

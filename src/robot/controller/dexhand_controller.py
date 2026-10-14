@@ -2,6 +2,7 @@
 
 from robot.controller.controller import Controller
 from typing import Dict, Any
+import numpy as np
 
 class DexHandController(Controller):
     def __init__(self):
@@ -36,7 +37,14 @@ class DexHandController(Controller):
                     self.set_joint(value)
                 if key == "action":
                     self.set_action(value)
-        
+
+    def set_joint(self, joint):
+        pass
+
+    def apply_reset(self, start_state):
+        target = np.zeros(6) if start_state is None else np.asarray(start_state, dtype=float)
+        self.set_joint(target)
+
     def __repr__(self):
         if self.controller is not None:
             return f"{self.name}: \n \

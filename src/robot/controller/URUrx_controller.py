@@ -19,3 +19,7 @@ class URUrxController(ArmController):
         self.controller = urx.Robot("192.168.0.100")
         self.controller .set_tcp((0, 0, 0.1, 0, 0, 0))
         self.controller .set_payload(2, (0, 0, 0.1))
+
+    def apply_reset(self, start_state):
+        joints = [0, 0, 0, 0, 0, 0] if start_state is None else list(start_state)
+        self.controller.movej(joints)

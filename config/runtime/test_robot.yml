@@ -1,0 +1,52 @@
+name: test_robot
+shm_name: cyr_test_robot
+cmd_capacity: 8
+components:
+  - name: left_arm
+    class_path: robot.controller.TestArm_controller
+    class_name: TestArmController
+    args: {name: left_arm, DoFs: 6, INFO: ERROR}
+    setup: {}
+    publish: [joint, eef, gripper]
+    rate_hz: 100
+    max_bytes: 65536
+  - name: right_arm
+    class_path: robot.controller.TestArm_controller
+    class_name: TestArmController
+    args: {name: right_arm, DoFs: 6, INFO: ERROR}
+    setup: {}
+    publish: [joint, eef, gripper]
+    rate_hz: 100
+    max_bytes: 65536
+  - name: test_mobile
+    class_path: robot.controller.TestMobile_controller
+    class_name: TestMobileController
+    args: {name: test_mobile, INFO: ERROR}
+    setup: {}
+    publish: [move_velocity, position]
+    rate_hz: 50
+    max_bytes: 65536
+  - name: cam_head
+    class_path: robot.sensor.TestVision_sensor
+    class_name: TestVisonSensor
+    args: {name: cam_head, INFO: ERROR}
+    setup: {is_depth: false}
+    publish: [color]
+    rate_hz: 30
+    max_bytes: 2097152
+  - name: cam_left_wrist
+    class_path: robot.sensor.TestVision_sensor
+    class_name: TestVisonSensor
+    args: {name: cam_left_wrist, INFO: ERROR}
+    setup: {is_depth: false}
+    publish: [color]
+    rate_hz: 30
+    max_bytes: 2097152
+  - name: cam_right_wrist
+    class_path: robot.sensor.TestVision_sensor
+    class_name: TestVisonSensor
+    args: {name: cam_right_wrist, INFO: ERROR}
+    setup: {is_depth: false}
+    publish: [color]
+    rate_hz: 30
+    max_bytes: 2097152

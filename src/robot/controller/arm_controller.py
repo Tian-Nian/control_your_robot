@@ -85,6 +85,11 @@ class ArmController(Controller):
     def set_position_teleop(self, position: np.ndarray):
         pass
 
+    def apply_reset(self, start_state):
+        dofs = int(getattr(self, "DoFs", 6))
+        joint = np.zeros(dofs) if start_state is None else np.asarray(start_state, dtype=float)
+        self.move({"joint": joint})
+
     def set_up(self):
         pass
 

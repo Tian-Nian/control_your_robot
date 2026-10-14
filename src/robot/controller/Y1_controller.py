@@ -1,12 +1,9 @@
 
 
 from robot.controller.arm_controller import ArmController
-from robot.utils.base.data_handler import debug_print, is_enter_pressed
-from robot.robot.base_robot import dict_to_list
+from robot.utils.base.data_handler import debug_print
 
 from y1_sdk import Y1SDKInterface, ControlMode
-import numpy as np
-import time
 
 '''
 Piper base code from:
@@ -81,40 +78,3 @@ class Y1Controller(ArmController):
                 pass
         except:
             pass
-if __name__=="__main__":
-    left_controller = Y1Controller("test_y1_left")
-    right_controller = Y1Controller("test_y1_right")
-    left_controller.set_up("can1", 3, False)
-    right_controller.set_up("can0", 3, False)
-
-    # left_controller.set_joint(np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1]))
-    # right_controller.set_joint(np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1]))
-    # time.sleep(2)
-    # left_controller.set_joint(np.array([0.1,0.1,-0.2,0.3,-0.2,0.5]))
-    # right_controller.set_joint(np.array([0.1,0.1,-0.2,0.3,-0.2,0.5]))
-    time.sleep(2)
-
-
-    from robot.utils.base.data_handler import hdf5_groups_to_dict
-    data_path = "save/test/0.hdf5"
-    episode = dict_to_list(hdf5_groups_to_dict(data_path))
-    for ep in episode:
-        left_move_data = {"joint": ep["left_arm"]["joint"],
-                          "gripper":ep["left_arm"]["gripper"]
-                          }
-        right_move_data = {"joint": ep["right_arm"]["joint"],
-                          "gripper":ep["right_arm"]["gripper"]
-                          }
-
-        left_controller.move(left_move_data)
-        right_controller.move(right_move_data)
-
-        time.sleep(0.1)
-    # time.sleep(1)
-    # print(controller.get_gripper())
-    # print(controller.get_state())
-
-    # controller.set_position(np.array([0.057, 0.0, 0.260, 0.0, 0.085, 0.0]))
-    # time.sleep(1)
-    # print(controller.get_gripper())
-    # print(controller.get_state())

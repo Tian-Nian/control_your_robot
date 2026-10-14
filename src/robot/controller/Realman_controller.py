@@ -37,8 +37,9 @@ class RealmanController(ArmController):
         except:
             debug_print(self.name, "Could not find Realman_IK in third_party, key[teleop_eef] will not take effect.", "WARNING")
 
-    def reset(self, start_angles):
+    def apply_reset(self, start_state):
         """Move robot to the specified start position"""
+        start_angles = [0, 0, 0, 0, 0, 0] if start_state is None else start_state
         print(f"\nMoving {self.name} arm to start position...")
         
         # Check if robot is still connected

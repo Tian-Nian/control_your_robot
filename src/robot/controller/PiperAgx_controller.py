@@ -515,8 +515,8 @@ class PiperAgxController(ArmController):
         else:
             self._set_teleop_enabled(False)
 
-    def reset(self, joint):
-        joint = np.asarray(joint, dtype=float)
+    def apply_reset(self, start_state):
+        joint = np.zeros(6) if start_state is None else np.asarray(start_state, dtype=float)
         self.controller.move_js(joint.tolist())
 
     def __del__(self):

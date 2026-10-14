@@ -26,6 +26,9 @@ dependencies = [
 [project.urls]
 Repository = "https://github.com/Tian-Nian/control_your_robot"
 
+[project.scripts]
+cyr = "robot.runtime.__main__:main"
+
 # ⭐ 关键配置：告诉 setuptools，包在 src/ 下面
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -39,4 +42,5 @@ members = ["packages/*"]
 
 [tool.pytest.ini_options]
 markers = ["manual: should be run manually."]
-testpaths = ["src", "scripts"]
+testpaths = ["src"]
+pythonpath = ["src"]
