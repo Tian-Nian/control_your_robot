@@ -1,0 +1,28 @@
+name: marvin_m6
+urdf: ../../../Marvin_M6-S-CCS-696-V4.0_Base_and_Stand_Asm_urdf/urdf/Marvin_M6-S-CCS-696-V4.0_Base_and_Stand_Asm_urdf.urdf
+collision:
+  - [Link2_L, Link_Stand]
+  - [Link3_L, Link_Stand]
+  - [Link2_R, Link_Stand]
+  - [Link3_R, Link_Stand]
+arms:
+  left:
+    joints: [Joint1_L, Joint2_L, Joint3_L, Joint4_L, Joint5_L, Joint6_L, Joint7_L]
+    home: [2.0933333333, -1.5707963268, -1.5707963268, -2.0933333333, 0.0, 0.0, 0.0]
+    base_frame: Base_L
+    flange_frame: TCP_Link_L
+    palm_frame: left_hand_box
+    unified_from_base:
+      - [1.0, 0.0, 0.0]
+      - [0.0, 0.0, 1.0]
+      - [0.0, -1.0, 0.0]
+  right:
+    joints: [Joint1_R, Joint2_R, Joint3_R, Joint4_R, Joint5_R, Joint6_R, Joint7_R]
+    home: [-2.0933333333, -1.5707963268, 1.5707963268, -2.0933333333, 0.0, 0.0, 0.0]
+    base_frame: Base_R
+    flange_frame: TCP_Link_R
+    palm_frame: right_hand_box
+    unified_from_base:
+      - [1.0, 0.0, 0.0]
+      - [0.0, 0.0, -1.0]
+      - [0.0, 1.0, 0.0]

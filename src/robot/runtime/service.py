@@ -50,17 +50,17 @@ def serve(config_path: Path) -> int:
 def start(config_path: Path) -> int:
     configure_logging()
     log = get_logger("service")
-    live = live_records()
-    if len(live) == 1:
-        print(f"已在运行 pid={live[0]['pid']}")
-        return 0
     clear_dead_records()
     try:
-        load_config(config_path)
+        config = load_config(config_path)
     except (OSError, ValueError) as exc:
         log.error("配置无效: %s", exc)
         print(exc, file=sys.stderr)
         return 1
+    same = [record for record in live_records() if record.get("shm_name") == config.shm_name]
+    if same:
+        print(f"已在运行 pid={same[0]['pid']}")
+        return 0
     driver_path = user_state_dir() / "driver.log"
     driver_path.parent.mkdir(parents=True, exist_ok=True)
     log_file = open(driver_path, "ab", buffering=0)
@@ -102,14 +102,18 @@ def stop(*, quiet: bool = False) -> int:
         clear_dead_records()
         _say("已停止", quiet=quiet)
         return 0
-    record = live[0]
+    for record in live:
+        _stop_one(record)
+    _say("已停止", quiet=quiet)
+    return 0
+
+
+def _stop_one(record: dict) -> None:
     pid = int(record["pid"])
-    path = Path(record["_path"])
     if not _signal(pid, signal.SIGTERM):
         _reap_if_child(pid)
-        remove_record(path)
-        _say("已停止", quiet=quiet)
-        return 0
+        remove_record(shm_name=str(record.get("shm_name") or ""))
+        return
     deadline = time.monotonic() + 10.0
     while time.monotonic() < deadline:
         if not pid_alive(pid):
@@ -121,9 +125,7 @@ def stop(*, quiet: bool = False) -> int:
         while time.monotonic() < kill_deadline and pid_alive(pid):
             time.sleep(0.05)
     _reap_if_child(pid)
-    remove_record(path)
-    _say("已停止", quiet=quiet)
-    return 0
+    remove_record(shm_name=str(record.get("shm_name") or ""))
 
 
 def restart() -> int:
@@ -143,10 +145,10 @@ def status() -> int:
     if not live:
         print("stopped")
         return 3
-    record = live[0]
-    print(
-        f"running pid={record['pid']} shm={record['shm_name']} config={record['config_path']} log={log_path()}"
-    )
+    for record in live:
+        print(
+            f"running pid={record['pid']} shm={record['shm_name']} config={record['config_path']} log={log_path()}"
+        )
     return 0
 
 

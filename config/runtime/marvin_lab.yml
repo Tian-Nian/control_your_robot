@@ -16,6 +16,17 @@ components:
       vel_ratio: 50
       acc_ratio: 50
       tool_dyn: [0.919, 9.783, 12.470, 91.993, 0.006, 0.0, 0.0, 0.029, 0.0, 0.0]
+    body: ../bodies/marvin.yml
+    gate:
+      arm: left
+      max_step_rad: 0.2
+      max_fk_error_m: 0.008
+      min_clearance_m: 0.04
+    motion:
+      enabled: true
+      max_step_rad: 0.05
+      tol_rad: 0.02
+      timeout_s: 12
     publish: [joint, eef, control_mode]
     rate_hz: 50
     max_bytes: 65536
@@ -33,6 +44,17 @@ components:
       vel_ratio: 50
       acc_ratio: 50
       tool_dyn: [0.930, 6.574, -8.853, 84.767, 0.021, 0.0, 0.0, 0.008, 0.0, 0.0]
+    body: ../bodies/marvin.yml
+    gate:
+      arm: right
+      max_step_rad: 0.2
+      max_fk_error_m: 0.008
+      min_clearance_m: 0.04
+    motion:
+      enabled: true
+      max_step_rad: 0.05
+      tol_rad: 0.02
+      timeout_s: 12
     publish: [joint, eef, control_mode]
     rate_hz: 50
     max_bytes: 65536

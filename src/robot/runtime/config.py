@@ -20,6 +20,9 @@ _COMPONENT_KEYS = {
     "publish",
     "rate_hz",
     "max_bytes",
+    "body",
+    "gate",
+    "motion",
 }
 
 
@@ -33,6 +36,9 @@ class ComponentConfig:
     publish: tuple[str, ...]
     rate_hz: float
     max_bytes: int
+    body: str = ""
+    gate: dict | None = None
+    motion: dict | None = None
 
     def as_spec(self) -> dict:
         return {
@@ -44,6 +50,9 @@ class ComponentConfig:
             "publish": list(self.publish),
             "rate_hz": self.rate_hz,
             "max_bytes": self.max_bytes,
+            "body": self.body,
+            "gate": dict(self.gate or {}),
+            "motion": dict(self.motion or {}),
         }
 
 
@@ -106,6 +115,15 @@ def _component(path: Path, raw: object) -> ComponentConfig:
         raise ValueError(f"{path}: {name}: rate_hz must be positive")
     if max_bytes < 64:
         raise ValueError(f"{path}: {name}: max_bytes must be at least 64")
+    body = raw.get("body") or ""
+    if not isinstance(body, str):
+        raise ValueError(f"{path}: {name}: body must be a path")
+    body_path = ""
+    if body.strip():
+        candidate = Path(body.strip())
+        if not candidate.is_absolute():
+            candidate = (path.parent / candidate).resolve()
+        body_path = str(candidate)
     return ComponentConfig(
         name=name,
         class_path=_require_str(raw, "class_path"),
@@ -115,6 +133,9 @@ def _component(path: Path, raw: object) -> ComponentConfig:
         publish=tuple(publish),
         rate_hz=rate_hz,
         max_bytes=max_bytes,
+        body=body_path,
+        gate=_mapping(raw.get("gate"), f"{name}.gate"),
+        motion=_mapping(raw.get("motion"), f"{name}.motion"),
     )
 
 

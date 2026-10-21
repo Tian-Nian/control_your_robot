@@ -59,6 +59,7 @@ def run_supervisor(config: RuntimeConfig) -> int:
             else:
                 write_record(
                     {
+                        "name": config.name,
                         "pid": os.getpid(),
                         "config_path": str(config.path),
                         "shm_name": config.shm_name,
@@ -87,7 +88,7 @@ def run_supervisor(config: RuntimeConfig) -> int:
             bus.latch_safety("服务关闭")
         stop_event.set()
         _join_all(processes)
-        remove_record()
+        remove_record(shm_name=config.shm_name)
         if bus is not None:
             bus.unlink()
         log.info("已关闭 exit=%s", exit_code)

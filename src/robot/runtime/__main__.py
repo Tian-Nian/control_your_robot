@@ -7,8 +7,6 @@ import json
 import sys
 from pathlib import Path
 
-from robot.runtime.client import RuntimeClient
-from robot.runtime.discover import live_records
 from robot.runtime.present import format_data
 from robot.runtime.service import restart, serve, start, status, stop
 
@@ -108,18 +106,21 @@ def _print_json(payload: dict) -> None:
 
 
 def echo(component: str) -> int:
-    records = live_records()
-    if not records:
-        print("未运行", file=sys.stderr)
-        return 1
-    client = RuntimeClient(str(records[0]["shm_name"]))
+    from robot.runtime.session import Session
+
     try:
-        if component not in client.component_names():
+        session = Session.attach()
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    try:
+        names = [item["name"] for item in session.describe()]
+        if component not in names:
             print(f"没有组件 {component}", file=sys.stderr)
             return 1
-        state = client.read_state(component)
+        state = session.read_raw(component)
     finally:
-        client.close()
+        session.close()
     if state is None:
         print("无数据")
         return 1

@@ -9,9 +9,17 @@ import time
 import traceback
 from collections import deque
 
+import numpy as np
+
+from robot.harness.gate import CommandRejected, validate_joints
+from robot.harness.motion import JointMotion
 from robot.runtime.log import configure_logging, get_logger
 from robot.runtime.safety import engage_safe_stop
 from robot.runtime.transport import Bus
+
+_CONTROL_MODES = frozenset(
+    {"impedance", "imp", "imp_joint", "teleop", "teleop_imp", "position", "pos"}
+)
 
 
 def load_component(spec: dict):
@@ -38,6 +46,7 @@ def run_component(shm_name: str, spec: dict, stop_event, factory=None) -> None:
             else:
                 component.set_up()
             component.set_collect_info(list(spec["publish"]))
+            _init_runtime_state(component, spec)
             log.info("set_up 完成 publish=%s rate_hz=%s", ",".join(spec["publish"]), spec["rate_hz"])
         except Exception as exc:
             log.exception("set_up 失败")
@@ -46,7 +55,6 @@ def run_component(shm_name: str, spec: dict, stop_event, factory=None) -> None:
             raise
         period = 1.0 / float(spec["rate_hz"])
         next_tick = time.monotonic()
-        cycles: deque[float] = deque()
         state_drops = 0
         error = ""
         while not stop_event.is_set():
@@ -55,12 +63,13 @@ def run_component(shm_name: str, spec: dict, stop_event, factory=None) -> None:
                 break
             started = time.monotonic()
             try:
-                move_error = _drain_commands(bus, component, name)
+                _advance(bus, spec, component, log)
             except Exception as exc:
                 fatal = True
                 log.exception("命令执行失败，触发安全保护")
                 bus.latch_safety(f"{name} 命令失败: {exc}")
                 break
+            move_error = str(getattr(component, "_cyr_last_cmd_error", "") or "")
             try:
                 data = component.get()
                 timestamp_ns = time.time_ns()
@@ -81,13 +90,6 @@ def run_component(shm_name: str, spec: dict, stop_event, factory=None) -> None:
                     log.info("周期恢复")
                 logged_error = error
             finished = time.monotonic()
-            cycles.append(finished)
-            while len(cycles) > 1 and finished - cycles[0] > 1.0:
-                cycles.popleft()
-            if len(cycles) >= 2 and cycles[-1] > cycles[0]:
-                hz = (len(cycles) - 1) / (cycles[-1] - cycles[0])
-            else:
-                hz = 0.0
             _read, write_seq, cmd_drops = bus.cmd_cursors(name)
             state = bus.read_state(name)
             _status(
@@ -96,11 +98,12 @@ def run_component(shm_name: str, spec: dict, stop_event, factory=None) -> None:
                 alive=True,
                 error=error,
                 drops=state_drops + cmd_drops,
-                hz=hz,
+                hz=_hz(component),
                 cycle_ms=(finished - started) * 1000.0,
                 state_seq=0 if state is None else int(state["seq"]),
                 cmd_read_seq=_read,
                 cmd_write_seq=write_seq,
+                **_motion_status(component),
             )
             next_tick += period
             delay = next_tick - time.monotonic()
@@ -167,6 +170,7 @@ def run_bundle(shm_name: str, specs: list[dict], stop_event) -> None:
                 else:
                     component.set_up()
                 component.set_collect_info(list(spec["publish"]))
+                _init_runtime_state(component, spec)
                 components.append(component)
                 log.info("%s set_up 完成 publish=%s", spec["name"], ",".join(spec["publish"]))
         except Exception as exc:
@@ -177,6 +181,7 @@ def run_bundle(shm_name: str, specs: list[dict], stop_event) -> None:
             raise
         period = 1.0 / max(float(spec["rate_hz"]) for spec in specs)
         next_tick = time.monotonic()
+        logged: dict[str, str] = {}
         while not stop_event.is_set():
             if bus.read_safety()["latched"]:
                 log.error("安全保护已触发: %s", bus.read_safety()["reason"])
@@ -185,13 +190,13 @@ def run_bundle(shm_name: str, specs: list[dict], stop_event) -> None:
                 name = spec["name"]
                 started = time.monotonic()
                 try:
-                    move_error = _drain_commands(bus, component, name)
+                    _advance(bus, spec, component, log)
                 except Exception as exc:
                     fatal = True
                     log.exception("%s 命令执行失败，触发安全保护", name)
                     bus.latch_safety(f"{name} 命令失败: {exc}")
                     break
-                error = move_error
+                error = str(getattr(component, "_cyr_last_cmd_error", "") or "")
                 try:
                     data = component.get()
                     timestamp_ns = time.time_ns()
@@ -201,8 +206,9 @@ def run_bundle(shm_name: str, specs: list[dict], stop_event) -> None:
                         error = "state exceeds max_bytes" if not error else f"{error}; state exceeds max_bytes"
                 except Exception as exc:
                     error = str(exc)
-                if error:
+                if error and error != logged.get(name):
                     log.error("%s 周期失败: %s", name, error)
+                logged[name] = error
                 state = bus.read_state(name)
                 _read, write_seq, cmd_drops = bus.cmd_cursors(name)
                 _status(
@@ -211,11 +217,12 @@ def run_bundle(shm_name: str, specs: list[dict], stop_event) -> None:
                     alive=True,
                     error=error,
                     drops=cmd_drops,
-                    hz=0.0,
+                    hz=_hz(component),
                     cycle_ms=(time.monotonic() - started) * 1000.0,
                     state_seq=0 if state is None else int(state["seq"]),
                     cmd_read_seq=_read,
                     cmd_write_seq=write_seq,
+                    **_motion_status(component),
                 )
             if fatal or bus.read_safety()["latched"]:
                 break
@@ -261,25 +268,303 @@ def _stop_device(log, component) -> None:
     log.warning("安全停止 action=%s", action)
 
 
-def _drain_commands(bus: Bus, component, name: str) -> str:
-    error = ""
+def _init_runtime_state(component, spec: dict) -> None:
+    component._cyr_body = _load_body(spec)
+    component._cyr_motion = None
+    component._cyr_motion_hold = False
+    component._cyr_last_cmd_seq = 0
+    component._cyr_last_cmd_error = ""
+    component._cyr_tracking_err = 0.0
+    component._cyr_motion_timeout_s = float((spec.get("motion") or {}).get("timeout_s") or 0.0)
+    component._cyr_cycles = deque()
+
+
+def _load_body(spec: dict):
+    path = spec.get("body") or ""
+    if not path:
+        return None
+    from robot.harness.body import BodyModel
+
+    return BodyModel.load(path)
+
+
+def _hz(component) -> float:
+    samples = component._cyr_cycles
+    now = time.monotonic()
+    samples.append(now)
+    while len(samples) > 1 and now - samples[0] > 1.0:
+        samples.popleft()
+    if len(samples) >= 2 and samples[-1] > samples[0]:
+        return (len(samples) - 1) / (samples[-1] - samples[0])
+    return 0.0
+
+
+def _motion_status(component) -> dict:
+    plan = getattr(component, "_cyr_motion", None)
+    return {
+        "last_cmd_seq": int(getattr(component, "_cyr_last_cmd_seq", 0) or 0),
+        "last_cmd_error": str(getattr(component, "_cyr_last_cmd_error", "") or ""),
+        "motion_active": plan is not None,
+        "motion_seq": 0 if plan is None else int(plan.seq),
+        "motion_timeout_s": float(getattr(component, "_cyr_motion_timeout_s", 0.0) or 0.0),
+        "tracking_err": float(getattr(component, "_cyr_tracking_err", 0.0) or 0.0),
+    }
+
+
+def _advance(bus: Bus, spec: dict, component, log) -> None:
+    if getattr(component, "_cyr_motion", None) is not None:
+        _step_motion(component)
+        return
+    if bus.read_safety()["latched"]:
+        return
+    command = bus.pop_cmd(spec["name"])
+    if command is None:
+        return
+    component._cyr_last_cmd_seq = int(command["seq"])
+    try:
+        _apply_command(spec, component, command)
+    except CommandRejected as exc:
+        component._cyr_motion = None
+        component._cyr_motion_hold = True
+        component._cyr_last_cmd_error = str(exc)
+        log.error("%s 拒绝命令: %s", spec["name"], exc)
+        return
+    if getattr(component, "_cyr_motion", None) is None:
+        component._cyr_last_cmd_error = ""
+
+
+def _apply_command(spec: dict, component, command: dict) -> None:
+    data = command["data"]
+    if not isinstance(data, dict):
+        raise CommandRejected("命令必须是对象")
+    if data.get("op") == "release":
+        component._cyr_motion_hold = False
+        component._cyr_last_cmd_error = ""
+        return
+    if getattr(component, "_cyr_motion_hold", False):
+        raise CommandRejected("组件保持当前位置，后续命令已拒绝")
+    if data.get("op") == "reset":
+        _apply_reset(spec, component, data.get("start_state"), int(command["seq"]))
+        return
+    payload = dict(data)
+    mode = payload.pop("control_mode", None)
+    eef = payload.get("eef")
+    if eef is not None and "joint" not in payload:
+        solved = _solve_eef(spec, component, eef, bool(command["is_delta"]))
+        if solved is not None:
+            joints, absolute = solved
+            payload = {"joint": joints.tolist(), "eef": np.asarray(absolute, dtype=float).reshape(-1).tolist()}
+    elif command["is_delta"] and "joint" in payload:
+        current = _current_joint(component)
+        try:
+            delta = np.asarray(payload["joint"], dtype=float).reshape(-1)
+            payload["joint"] = (current + delta).tolist()
+        except (TypeError, ValueError) as exc:
+            raise CommandRejected("关节目标必须是数字") from exc
+        command = {**command, "is_delta": False}
+    checked = None
+    if "joint" in payload and (_motion_enabled(spec) or _gate_configured(spec, component)):
+        current = _current_joint(component)
+        try:
+            checked = _gate(
+                spec,
+                component,
+                current,
+                payload["joint"],
+                eef=payload.get("eef"),
+                trajectory=_motion_enabled(spec),
+            )
+        except (TypeError, ValueError) as exc:
+            raise CommandRejected("关节目标必须是数字") from exc
+        payload = {**payload, "joint": checked.tolist()}
+    if mode is not None:
+        _apply_mode(component, mode)
+    if checked is not None and _motion_enabled(spec):
+        _start_joint(spec, component, checked, int(command["seq"]))
+        return
     move = getattr(component, "move", None)
+    if not any(key in payload for key in ("joint", "eef", "gripper", "action", "velocity", "force")):
+        return
+    if move is None:
+        return
+    move(payload, is_delta=bool(command["is_delta"]) and "joint" not in payload)
+
+
+def _apply_reset(spec: dict, component, start_state, seq: int) -> None:
+    if not _motion_enabled(spec) and not _gate_configured(spec, component):
+        reset = getattr(component, "reset", None)
+        if reset is not None:
+            reset(start_state)
+        return
+    if start_state is not None:
+        goal = np.asarray(start_state, dtype=float).reshape(-1)
+    else:
+        body = getattr(component, "_cyr_body", None)
+        arm = _arm_name(spec)
+        if body is None or arm not in body.arm_names():
+            raise CommandRejected("没有 home，不能复位")
+        goal = body.home(arm)
+    if _motion_enabled(spec):
+        _begin_joint(spec, component, goal, seq, eef=None)
+        return
+    current = _current_joint(component)
+    checked = _gate(spec, component, current, goal, eef=None, trajectory=False)
     reset = getattr(component, "reset", None)
-    while True:
-        if bus.read_safety()["latched"]:
-            return error
-        command = bus.pop_cmd(name)
-        if command is None:
-            return error
-        data = command["data"]
-        if isinstance(data, dict) and data.get("op") == "reset":
-            if reset is None:
-                continue
-            reset(data.get("start_state"))
-            continue
-        if move is None:
-            continue
-        move(data, is_delta=command["is_delta"])
+    if reset is not None:
+        reset(checked.tolist())
+
+
+def _begin_joint(spec: dict, component, goal, seq: int, eef) -> None:
+    current = _current_joint(component)
+    checked = _gate(spec, component, current, goal, eef=eef, trajectory=True)
+    _start_joint(spec, component, checked, seq)
+
+
+def _start_joint(spec: dict, component, goal, seq: int) -> None:
+    motion = spec.get("motion") or {}
+    component._cyr_motion_timeout_s = _cfg_float(motion, "timeout_s", 8.0)
+    try:
+        plan = JointMotion(
+            _current_joint(component),
+            goal,
+            max_step_rad=_cfg_float(motion, "max_step_rad", 0.05),
+            tol_rad=_cfg_float(motion, "tol_rad", 0.02),
+            timeout_s=component._cyr_motion_timeout_s,
+            seq=seq,
+        )
+    except ValueError as exc:
+        raise CommandRejected(str(exc)) from exc
+    component._cyr_motion = plan
+    component._cyr_last_cmd_error = ""
+    _step_motion(component)
+
+
+def _apply_mode(component, mode) -> None:
+    if str(mode).strip().lower() not in _CONTROL_MODES:
+        raise CommandRejected(f"control_mode 只能是 impedance 或 position，得到 {mode!r}")
+    move = getattr(component, "move", None)
+    if move is not None:
+        move({"control_mode": mode}, is_delta=False)
+
+
+def _step_motion(component) -> None:
+    plan = component._cyr_motion
+    if plan is None:
+        return
+    measured = _current_joint(component)
+    component._cyr_tracking_err = plan.error(measured)
+    if plan.tracked(measured):
+        component._cyr_motion = None
+        component._cyr_last_cmd_error = ""
+        return
+    if plan.timed_out():
+        component._cyr_motion = None
+        component._cyr_motion_hold = True
+        component._cyr_last_cmd_error = "跟踪超时"
+        return
+    point = plan.goal if plan.command_reached() else plan.advance()
+    move = getattr(component, "move", None)
+    if move is not None:
+        move({"joint": np.asarray(point, dtype=float).tolist()}, is_delta=False)
+    measured = _current_joint(component)
+    component._cyr_tracking_err = plan.error(measured)
+    if plan.tracked(measured):
+        component._cyr_motion = None
+        component._cyr_last_cmd_error = ""
+
+
+def _solve_eef(spec: dict, component, eef, is_delta: bool):
+    """返回 (关节解, 绝对末端)。没有身体模型时返回 None，原样下发。"""
+    body = getattr(component, "_cyr_body", None)
+    arm = _arm_name(spec)
+    if body is None or arm not in body.arm_names():
+        return None
+    current = _current_joint(component)
+    try:
+        raw = np.asarray(eef, dtype=float).reshape(-1)
+    except (TypeError, ValueError) as exc:
+        raise CommandRejected("末端目标必须是数字") from exc
+    target = raw
+    if is_delta:
+        pose = np.asarray(body.flange_pose(arm, current), dtype=float).reshape(-1)
+        target = pose.copy()
+        count = min(target.size, raw.size)
+        target[:count] = pose[:count] + raw[:count]
+    gate = spec.get("gate") or {}
+    solved = body.ik(arm, current, target, max_error_m=_cfg_float(gate, "max_fk_error_m", 0.008))
+    return solved, target
+
+
+def _gate(spec: dict, component, current, target, *, eef, trajectory: bool) -> np.ndarray:
+    gate = spec.get("gate") or {}
+    body = getattr(component, "_cyr_body", None)
+    arm = _arm_name(spec)
+    clearance = None
+    flange = None
+    if body is not None and arm in body.arm_names():
+        lower, upper = body.limits(arm)
+        clearance = lambda sample, arm=arm, body=body: body.clearance(arm, sample)
+        flange = lambda sample, arm=arm, body=body: body.flange_pose(arm, sample)
+    elif "lower" in gate and "upper" in gate:
+        lower = gate["lower"]
+        upper = gate["upper"]
+    else:
+        return np.asarray(target, dtype=float).reshape(-1)
+    motion = spec.get("motion") or {}
+    return validate_joints(
+        current,
+        target,
+        lower=lower,
+        upper=upper,
+        max_step_rad=_cfg_float(gate, "max_step_rad", 0.2),
+        min_clearance_m=_cfg_float(gate, "min_clearance_m", 0.0),
+        clearance=clearance,
+        eef=eef,
+        flange=flange,
+        max_fk_error_m=_cfg_float(gate, "max_fk_error_m", 0.008),
+        trajectory=trajectory,
+        path_step_rad=_cfg_float(motion, "max_step_rad", _cfg_float(gate, "max_step_rad", 0.05)),
+    )
+
+
+def _cfg_float(mapping, key: str, default: float) -> float:
+    if not isinstance(mapping, dict) or mapping.get(key) is None:
+        return float(default)
+    return float(mapping[key])
+
+
+def _gate_configured(spec: dict, component) -> bool:
+    gate = spec.get("gate") or {}
+    body = getattr(component, "_cyr_body", None)
+    if body is not None and _arm_name(spec) in body.arm_names():
+        return True
+    return "lower" in gate and "upper" in gate
+
+
+def _motion_enabled(spec: dict) -> bool:
+    return bool((spec.get("motion") or {}).get("enabled"))
+
+
+def _arm_name(spec: dict) -> str:
+    gate = spec.get("gate") or {}
+    if gate.get("arm"):
+        return str(gate["arm"])
+    name = str(spec.get("name") or "")
+    if name.endswith("_arm"):
+        return name[: -len("_arm")]
+    return name
+
+
+def _current_joint(component) -> np.ndarray:
+    getter = getattr(component, "get_state", None)
+    if callable(getter):
+        state = getter()
+        if isinstance(state, dict) and state.get("joint") is not None:
+            return np.asarray(state["joint"], dtype=float).reshape(-1)
+    data = component.get()
+    if isinstance(data, dict) and data.get("joint") is not None:
+        return np.asarray(data["joint"], dtype=float).reshape(-1)
+    raise CommandRejected("读不到当前关节")
 
 
 def _status(
@@ -294,6 +579,12 @@ def _status(
     state_seq: int = 0,
     cmd_read_seq: int = 0,
     cmd_write_seq: int = 0,
+    last_cmd_seq: int = 0,
+    last_cmd_error: str = "",
+    motion_active: bool = False,
+    motion_seq: int = 0,
+    motion_timeout_s: float = 0.0,
+    tracking_err: float = 0.0,
 ) -> None:
     bus.write_status(
         name,
@@ -307,5 +598,11 @@ def _status(
             "cmd_write_seq": int(cmd_write_seq),
             "drops": int(drops),
             "error": error,
+            "last_cmd_seq": int(last_cmd_seq),
+            "last_cmd_error": last_cmd_error,
+            "motion_active": bool(motion_active),
+            "motion_seq": int(motion_seq),
+            "motion_timeout_s": float(motion_timeout_s),
+            "tracking_err": float(tracking_err),
         },
     )

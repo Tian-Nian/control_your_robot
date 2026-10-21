@@ -17,17 +17,21 @@ class Session:
         self._config = config
 
     @classmethod
-    def attach(cls) -> Session:
+    def attach(cls, name: str | None = None) -> Session:
         records = live_records()
         if not records:
             raise RuntimeError("未运行")
-        record = records[0]
+        record = _select_record(records, name)
         config = load_config(record["config_path"])
         client = RuntimeClient(str(record["shm_name"]))
         return cls(client, config)
 
     def close(self) -> None:
         self._client.close()
+
+    def read_raw(self, name: str) -> dict | None:
+        """最新原始观测。图像保留像素，给对齐观测用。"""
+        return self._client.read_state(name)
 
     def describe(self) -> list[dict]:
         return [
@@ -70,7 +74,13 @@ class Session:
 
     def _wait(self, name: str, seq: int, timeout: float) -> dict:
         deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
+        motion_deadline = None
+        while True:
+            now = time.monotonic()
+            if motion_deadline is None and now >= deadline:
+                return _result(False, seq, "超时", self._state(name))
+            if motion_deadline is not None and now >= motion_deadline:
+                return _result(False, seq, "跟踪超时", self._state(name))
             safety = self._read_safety()
             if safety["latched"]:
                 return _result(False, seq, safety["reason"] or "安全保护已触发", self._state(name))
@@ -79,10 +89,16 @@ class Session:
             except FileNotFoundError:
                 return _result(False, seq, "共享内存不存在", None)
             if status is not None and int(status.get("cmd_read_seq") or 0) >= seq:
+                if int(status.get("last_cmd_seq") or 0) == seq and status.get("last_cmd_error"):
+                    return _result(False, seq, str(status["last_cmd_error"]), self._state(name))
+                if status.get("motion_active") and int(status.get("motion_seq") or 0) == seq:
+                    if motion_deadline is None:
+                        motion_deadline = now + float(status.get("motion_timeout_s") or timeout) + 0.5
+                    time.sleep(0.01)
+                    continue
                 error = str(status.get("error") or "")
                 return _result(True, seq, error, self._state(name))
             time.sleep(0.01)
-        return _result(False, seq, "超时", self._state(name))
 
     def _spec(self, name: str) -> dict | None:
         for item in self.describe():
@@ -102,6 +118,20 @@ class Session:
         except FileNotFoundError:
             return {"latched": True, "reason": "共享内存不存在"}
         return {"latched": bool(safety.get("latched")), "reason": str(safety.get("reason") or "")}
+
+
+def _select_record(records: list[dict], name: str | None) -> dict:
+    if name is None:
+        if len(records) != 1:
+            listed = ", ".join(str(item.get("shm_name") or item.get("name")) for item in records)
+            raise RuntimeError(f"有多台服务: {listed}")
+        return records[0]
+    matches = [item for item in records if name in (item.get("name"), item.get("shm_name"))]
+    if not matches:
+        raise RuntimeError(f"没有服务 {name}")
+    if len(matches) != 1:
+        raise RuntimeError(f"服务 {name} 不唯一")
+    return matches[0]
 
 
 def _accepts_commands(class_path: str) -> bool:
