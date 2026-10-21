@@ -69,6 +69,8 @@ def start(config_path: Path) -> int:
         src = str(source_root())
         previous = env.get("PYTHONPATH")
         env["PYTHONPATH"] = src if not previous else src + os.pathsep + previous
+        # 家目录里的 NumPy 1.x 会盖住环境里的 NumPy 2，Pinocchio 就起不来。
+        env["PYTHONNOUSERSITE"] = "1"
         resolved = str(Path(config_path).resolve())
         log.info("start config=%s", resolved)
         process = subprocess.Popen(

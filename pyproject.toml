@@ -23,6 +23,9 @@ dependencies = [
     "msgpack>=1.0.5",
 ]
 
+[project.optional-dependencies]
+sim = ["rerun-sdk"]
+
 [project.urls]
 Repository = "https://github.com/Tian-Nian/control_your_robot"
 

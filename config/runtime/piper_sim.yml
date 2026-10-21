@@ -1,0 +1,14 @@
+name: piper_sim
+shm_name: cyr_piper_sim
+cmd_capacity: 8
+components:
+  - name: left_arm
+    class_path: robot.controller.PiperSim_controller
+    class_name: PiperSimController
+    args:
+      name: left_arm
+      INFO: ERROR
+      spawn: true
+    publish: [joint, eef, gripper, result]
+    rate_hz: 50
+    max_bytes: 65536

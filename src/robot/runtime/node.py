@@ -346,6 +346,15 @@ def _apply_command(spec: dict, component, command: dict) -> None:
     if data.get("op") == "reset":
         _apply_reset(spec, component, data.get("start_state"), int(command["seq"]))
         return
+    if data.get("op") in ("gravity", "impedance", "cartesian", "mit", "pose", "tool_delta", "touch"):
+        handler = getattr(component, "handle_runtime_op", None)
+        if handler is None:
+            raise CommandRejected(f"组件不接受 {data.get('op')}")
+        try:
+            handler(data)
+        except Exception as exc:
+            raise CommandRejected(str(exc)) from exc
+        return
     payload = dict(data)
     mode = payload.pop("control_mode", None)
     eef = payload.get("eef")
