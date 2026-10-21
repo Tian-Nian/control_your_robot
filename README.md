@@ -5,7 +5,14 @@
 
 # A new open-source project has been released, building upon this project.
 [X-One-Pipeline](https://github.com/XsparkAI/X-One-Pipeline)
-This project now just provide sample based on Y1-IMETA cause we only have this brand robotic arm. Other brand robotic arm also support, you can find it at src.robot.controller, same as this project, and to realize a new robot, just make a config like config/x-one.yml, and a ${robot}.py at src/robot/robot, add it into src/robot/robot/__init__.py, then you can use your robot in the new project.
+
+X-One-Pipeline currently ships a Y1-IMETA sample. Drivers for other arms stay in this repository under `src/robot/controller`. To add a robot inside X-One-Pipeline, add a config such as `config/x-one.yml`, a `${robot}.py` under that project's `src/robot/robot`, and register it in `src/robot/robot/__init__.py`. Those two paths are part of X-One-Pipeline. This repository does not contain `config/x-one.yml`.
+
+# Recent updates (2026-10)
+
+The shared-memory runtime is on [`feat/shm-runtime`](https://github.com/Tian-Nian/control_your_robot/tree/feat/shm-runtime). Controllers and sensors run as a service. A client reads the latest observation and sends commands with `cyr` or `robot.runtime.session.Session`. That branch also checks joint commands before they are sent, tracks them in limited steps, and exposes `robot.harness` for policy code.
+
+`main` remains the collect, xspark, and XPolicyLab deploy stack documented below. `cyr` and `config/runtime/` are not on this branch.
 
 # Recent updates (2026-07)
 
@@ -172,31 +179,28 @@ In this new sdk, we support reset robotic-arm while in teleop mode, cause we ena
 We also provide a simple teleop script `example/teleop/master_slave_arm_teleop_fs.py` to show how to use the new sdk to control the robot, you can have a try. Also a robot demo `agilex_piperAgx_dual_base.py` provided in `my_robot`.
 
 # Robot Node support!
-Now you can you `example/collect/collect_node.py` to easily collect robot data paradell, this pipeline will decorate Robot class with an node. Just have a try.
+Use `example/collect/collect_node.py` to collect robot data in parallel. The script wraps the robot class with a node.
 
-# visualize data by rerun!
-refer to `scripts/visual_hdf5_rerun.sh` to visual your data, support type:
+# Visualize data with Rerun
+Use `scripts/visual_hdf5_rerun.sh` to visualize data. Supported inputs:
 1. control_your_robot raw data
-2. act / rdt hdf5 data
+2. ACT / RDT HDF5 data
 
-# Data collect pipeline now can choose to save the data into the format you want!
-You can try it by switch to the branch--`newest` to have a try.  
-A function added at `CollectAny` called `_add_data_transform_pipeline()`, add we provide two choice under `utils/data_transofrm_pipeline.py`:
-1. `image_rgb_encode_pipeline`  
-this will encode every egb image in your data, then save it, it will cost lower memory for data saving by using jepg.
-2. `general_hdf5_rdt_format_pipeline`  
-this will save the data into rdt_hdf5 format without instruction.
+# The collector can write another format
+`CollectAny._add_data_transform_pipeline()` selects a writer. Both writers are in `src/robot/utils/base/data_transform_pipeline.py` on this branch:
+1. `image_rgb_encode_pipeline` encodes each RGB image as JPEG before saving, which uses less disk.
+2. `general_hdf5_rdt_format_pipeline` writes RDT HDF5 without an instruction.
 
-# RoboTwin depoly pipeline support!
-Now we already support RoboTwin pipeline! You can refer to under step for your Sim2Real experiment!
-1. link `RoboTwin` policy to `control_your_robot` policy
+# RoboTwin deploy pipeline
+RoboTwin deployment is supported. For a Sim2Real run:
+1. Link a RoboTwin policy into this repo's `policy/` directory.
 ```bash
 # example
-ln -s path/to/RoboTwin/polciy/pi0 path/to/control_your_robot/policy/
+ln -s path/to/RoboTwin/policy/pi0 path/to/control_your_robot/policy/
 ```
 
-2. modify `deploy.sh`
-By using `RoboTwin` pipeline, you should set `--robotwin` first, then extra info should be set like:
+2. Edit `deploy.sh` at the repository root.
+Pass `--robotwin` first, then the extra RoboTwin arguments:
 ```bash
 # pi0 eval.sh
 python script/eval_policy.py --config policy/$policy_name/deploy_policy.yml \
@@ -261,20 +265,20 @@ os.environ["INFO_LEVEL"] = "DEBUG" # DEBUG , INFO, ERROR
 To collect your robot data, just change the robot class in this file.
 ```bash
 # Node collect
-python exaexample/collect/collect_node.py
-# Single-threaded (may have accumulated delays due to function execution)
+python example/collect/collect_node.py
+# Single-threaded (delays inside one call can pile up)
 python example/collect/collect.py
 ```
 
 2. Model Deployment Tests
 
-To deploy the model on your robot, you just need to setup a model class in `src/robot/policy/test_policy/inference_model.py` like under `src/robot/policy/`. Then setup your robot in `scripts/deploy.sh`.
+To deploy a model, put the model class in `src/robot/policy/test_policy/inference_model.py`, following the other packages under `src/robot/policy/`. Point the robot at it from `deploy.sh` in the repository root. There is no `scripts/deploy.sh`.
 
 ```bash
 # General deployment script
 bash deploy.sh
 # Offline data replay consistency test
-# you should generate data at least 3 data first by running: python example/collect/collect.py
+# Collect at least three episodes first: python example/collect/collect.py
 bash eval_offline.sh
 ```
 
@@ -293,15 +297,15 @@ python scripts/client.py
 ```python
 # Collect keypoints and perform trajectory replay
 python scripts/collect_moving_ckpt.py 
-# SAPIEN simulation, see planner/README.md for details
+# SAPIEN simulation, see src/robot/planner/README.md
 ```
 
 5. Debug Scripts
 ```bash
-# Because controller and sensor packages have __init__.py, execute with -m
-python -m src.robot.controller.TestArm_controller
-python -m src.robot.sensor.TestVision_sensor
-python -m my_robot.test_robot
+# Packages live under src/. Use an editable install, or set PYTHONPATH.
+PYTHONPATH=src python -m robot.controller.TestArm_controller
+PYTHONPATH=src python -m robot.sensor.TestVision_sensor
+PYTHONPATH=src python -m my_robot.test_robot
 ```
 
 6. Data Conversion Scripts
@@ -318,18 +322,18 @@ python scripts/convert2openpi.py --raw_dir save/openpi_hdf5/ --repo_id my_repo_i
 7. upload data
 **Important!!!**
 
-sensor.vision_sensor already set encode_rgb=True by DEFAULT, you do not need to use encode and decode.
+`vision_sensor` publishes color as JPEG when `is_jpeg` is true, which is the default. The old `encode_rgb` flag has been removed.
 
 ```bash
 # In the original dataset, image files occupy a large amount of storage space, which is unfavorable for data transmission. Therefore, a compression and decompression script is provided. It performs JPEG processing on the images to enable faster transfer. The script is configured by default for a dual-arm, three-view setup, but it can be adjusted according to specific needs.
-# compress. will make a new floder: path/to/floder/_zip/
-python scripts/upload_zip.py path/to/floder --encode
+# Compress. This writes path/to/folder/_zip/.
+python scripts/upload_zip.py path/to/folder --encode
 
-# decompress.
-python scripts/upload_zip.py path/to/floder
+# Decompress.
+python scripts/upload_zip.py path/to/folder
 ```
 
-8. telop by joint/eef
+8. Teleop by joint or eef
 ```bash
 # We provide two general architectures for teleoperation-based data collection. The first one is relatively simple, where the teleoperation control frequency is aligned with the data collection frequency. The second one is slightly more complex, allowing the teleoperation frequency to far exceed the data recording frequency. Both architectures have been validated through real-world robot experiments.
 # same freq
@@ -373,35 +377,25 @@ show_pic(self, data_path, pic_name):
 ### 🤖 Supported Devices
 
 #### 🎛️ Controllers
-**✅ Implemented**
-| Robotic Arm       | Mobile Base        | Dexterous Hand  | Others     |
-|------------------|------------------|----------------|------------|
-| Agilex Piper     | Agilex Tracer2.0 | 🚧 In Development | 📦 To Be Added |
-| RealMan 65B      | Agilex bunker     | 📦 To Be Added    | 📦 To Be Added |
-| Daran ALOHA      | 📦 To Be Added     | 📦 To Be Added    | 📦 To Be Added |
-| Y1 ALOHA      | 📦 To Be Added     | 📦 To Be Added    | 📦 To Be Added |
+Classes that are already in `src/robot/controller/`:
 
-**🚧 Planned Support**
-| Robotic Arm      | Mobile Base       | Dexterous Hand | Others     |
-|-----------------|-----------------|----------------|------------|
-| JAKA             | 📦 To Be Added    | 📦 To Be Added | 📦 To Be Added |
-| Franka           | 📦 To Be Added    | 📦 To Be Added | 📦 To Be Added |
-| UR5e             | 📦 To Be Added    | 📦 To Be Added | 📦 To Be Added |
+| Robotic arm | Mobile base | Hand |
+|-------------|-------------|------|
+| Agilex Piper, Piper Agx | Agilex Tracer 2.0 | `dexhand_controller.py` is a base class, not a finished hand |
+| RealMan 65B, including the ROS variant | Agilex Bunker | |
+| Daran ALOHA, Y1 | | |
+| Franka (`FrankaFranky_controller.py`), UR (`URUrx_controller.py`) | | |
+
+JAKA does not have a controller in this branch. Wuji Hand 2 is on [`feat/shm-runtime`](https://github.com/Tian-Nian/control_your_robot/tree/feat/shm-runtime), not here.
 
 #### 📡 Sensors
-**✅ Implemented**
-| Vision Sensors   | Tactile Sensors | Other Sensors |
-|-----------------|----------------|---------------|
-| RealSense Series | Vitac3D        | 📦 To Be Added |
-
-**🚧 Planned Support**
-For new sensor support requests, please open an issue, or submit a PR with your sensor configuration!
+Classes that are already in `src/robot/sensor/`: RealSense, OpenCV, ROS images, Vitac3D, ROS / ROS 2 tactile gloves, Pika, and Quest. Orbbec and Moxian are on `feat/shm-runtime`. Open an issue or a pull request for another sensor.
 
 ## Directory Overview
 | Directory       | Description                  | Main Content |
 |----------------|-----------------------------|--------------|
 | **📂 controller** | Robot controller wrappers  | Classes for controlling arms, mobile bases, etc. |
-| **📂 sensor**    | Sensor wrappers            | Currently only RealSense cameras |
+| **📂 sensor**    | Sensor wrappers            | RealSense, OpenCV, ROS images, Vitac3D, tactile gloves, Pika, Quest |
 | **📂 utils**     | Utility functions          | Math, logging, and other helper functions |
 | **📂 data**      | Data collection module     | Classes for data recording and processing |
 | **📂 my_robot**  | Robot integration wrappers | Full robot system composition classes |

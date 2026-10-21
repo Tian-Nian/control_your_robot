@@ -1,6 +1,6 @@
 # Agent Guide — control_your_robot
 
-This file orients coding agents to the repo layout, conventions, and the most common end-to-end workflows.
+This file describes `main`: collect, xspark conversion, and XPolicyLab deploy. The shared-memory runtime, `cyr`, joint gate, and `robot.harness` are on [`feat/shm-runtime`](https://github.com/Tian-Nian/control_your_robot/tree/feat/shm-runtime). Do not look for `config/runtime/` or `src/robot/runtime/` on this branch.
 
 ## Project purpose
 
