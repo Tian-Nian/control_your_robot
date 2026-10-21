@@ -112,6 +112,14 @@ class DrAlohaController(ArmController):
     def zero_gravity(self):
         self.controller.set_torques(id_list=[1,2,3,4,5,6,7], torque_list=[0, 0, 0, 0, 0, 0, 0], param=0, mode=0) # 设置对应关节扭矩
 
+    def set_force(self, force):
+        """关节力矩。SDK set_torques，前 6 轴是手臂，夹爪保持 0。mode=0 与零力拖动相同。"""
+        values = np.asarray(force, dtype=float).reshape(-1)
+        if values.size != 6:
+            raise ValueError(f"力矩需要 6 个数，得到 {values.size}")
+        torque_list = [float(item) for item in values] + [0.0]
+        self.controller.set_torques(id_list=[1, 2, 3, 4, 5, 6, 7], torque_list=torque_list, param=0, mode=0)
+
     # 返回单位为米
     def get_state(self):
         state = {}

@@ -22,6 +22,11 @@ _SIDE_ARM = {"left": "A", "right": "B"}
 _ARM_SIDE = {"A": "left", "B": "right"}
 _DEFAULT_K = [16.0, 16.0, 16.0, 8.0, 8.0, 8.0, 8.0]
 _DEFAULT_D = [1.8, 1.8, 1.8, 1.8, 1.8, 1.8, 1.8]
+# 笛卡尔阻抗的 K 单位：平移 N/m，旋转 N·m/rad。D 是 0~1 的比例。demo 用的就是这组。
+_DEFAULT_CART_K = [3000.0, 3000.0, 3000.0, 100.0, 100.0, 100.0, 20.0]
+_DEFAULT_CART_D = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+_DEFAULT_FORCE_DIR = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+_DEFAULT_FORCE_ADJ_MM = 50.0
 _DEFAULT_TOOL = {
     "left": [0.919, 9.783, 12.470, 91.993, 0.006, 0.0, 0.0, 0.029, 0.0, 0.0],
     "right": [0.930, 6.574, -8.853, 84.767, 0.021, 0.0, 0.0, 0.008, 0.0, 0.0],
@@ -108,7 +113,23 @@ def normalize_control_mode(mode: str) -> str:
         return "impedance"
     if name in ("position", "pos"):
         return "position"
-    raise ValueError(f"control_mode 只能是 impedance 或 position，得到 {mode!r}")
+    if name in ("cartesian", "imp_cart", "cart"):
+        return "cartesian"
+    if name in ("force", "imp_force"):
+        return "force"
+    raise ValueError(f"control_mode 只能是 position、impedance、cartesian 或 force，得到 {mode!r}")
+
+
+def joint_torque_from_feedback(data: dict, arm_id: str) -> np.ndarray | None:
+    """SDK 反馈 fb_joint_sToq，关节实际扭矩。没有这一字段时返回 None。"""
+    output = data["outputs"][_ARM_INDEX[arm_id]]
+    torque = output.get("fb_joint_sToq")
+    if torque is None:
+        return None
+    values = np.asarray(torque, dtype=float).reshape(-1)
+    if values.size < _DOF:
+        raise RuntimeError(f"Marvin {arm_id} 力矩长度 {values.size}")
+    return values[:_DOF].copy()
 
 
 class MarvinArmController(ArmController):
@@ -128,6 +149,12 @@ class MarvinArmController(ArmController):
         self._mode = "impedance"
         self._joint_K = list(_DEFAULT_K)
         self._joint_D = list(_DEFAULT_D)
+        self._cart_K = list(_DEFAULT_CART_K)
+        self._cart_D = list(_DEFAULT_CART_D)
+        self._cart_rot = 2
+        self._cart_para = [0.0] * _DOF
+        self._force_dir = list(_DEFAULT_FORCE_DIR)
+        self._force_adj_mm = _DEFAULT_FORCE_ADJ_MM
         self._vel_ratio = 50
         self._acc_ratio = 50
         self._home = np.asarray(_DEFAULT_HOME["left"], dtype=float)
@@ -144,6 +171,12 @@ class MarvinArmController(ArmController):
         acc_ratio: int = 50,
         tool_dyn: list | None = None,
         home_joint: list | None = None,
+        cart_K: list | None = None,
+        cart_D: list | None = None,
+        cart_rot: int = 2,
+        cart_ctrl: list | None = None,
+        force_dir: list | None = None,
+        force_adj_mm: float = _DEFAULT_FORCE_ADJ_MM,
         _connect=None,
         _kine=None,
     ):
@@ -152,6 +185,12 @@ class MarvinArmController(ArmController):
         self._mode = normalize_control_mode(control_mode)
         self._joint_K = [float(v) for v in (joint_K if joint_K is not None else _DEFAULT_K)]
         self._joint_D = [float(v) for v in (joint_D if joint_D is not None else _DEFAULT_D)]
+        self._cart_K = [float(v) for v in (cart_K if cart_K is not None else _DEFAULT_CART_K)]
+        self._cart_D = [float(v) for v in (cart_D if cart_D is not None else _DEFAULT_CART_D)]
+        self._cart_rot = int(cart_rot)
+        self._cart_para = [0.0] * _DOF if cart_ctrl is None else [float(v) for v in cart_ctrl]
+        self._force_dir = [float(v) for v in (force_dir if force_dir is not None else _DEFAULT_FORCE_DIR)]
+        self._force_adj_mm = float(force_adj_mm)
         self._vel_ratio = int(vel_ratio)
         self._acc_ratio = int(acc_ratio)
         self._home = np.asarray(
@@ -166,22 +205,29 @@ class MarvinArmController(ArmController):
 
     def get_information(self):
         state = self.get_state()
-        return {
+        info = {
             "joint": state["joint"],
             "eef": state["eef"],
             "mode": state["mode"],
             "control_mode": state["control_mode"],
         }
+        if "force" in state:
+            info["force"] = state["force"]
+        return info
 
     def get_state(self) -> dict:
         data = self._read()
         joint, mode = joints_from_feedback(data, self.arm_id)
-        return {
+        state = {
             "joint": joint,
             "eef": flange_pose(self._kine.fk(joints=np.degrees(joint).tolist()), self.side),
             "mode": mode,
             "control_mode": self._mode,
         }
+        torque = joint_torque_from_feedback(data, self.arm_id)
+        if torque is not None:
+            state["force"] = torque
+        return state
 
     def move_controller(self, move_data, is_delta=False):
         payload = dict(move_data)
@@ -196,6 +242,23 @@ class MarvinArmController(ArmController):
             raise RuntimeError(f"{self.name} 尚未使能")
         self._command_joint(np.asarray(joint, dtype=float))
 
+    def set_force(self, force: np.ndarray):
+        """末端力。SDK 是 set_imp_force_state 加 set_force_cmd，单位 N。
+
+        方向和行程在 set_up 的 force_dir、force_adj_mm。关节力矩没有单独的指令口，
+        驱动在扭矩状态里按阻抗自己生成，读回来的是 fb_joint_sToq。
+        """
+        values = np.asarray(force, dtype=float).reshape(-1)
+        if values.size != 1:
+            raise ValueError(
+                f"{self.name} 的 set_force 是末端力，只要 1 个数，单位 N，得到 {values.size}"
+            )
+        if not self._enabled or self._mode != "force":
+            self.set_control_mode("force")
+        ok = self._with_sdk(lambda robot: robot.set_force_cmd(arm=self.arm_id, force=float(values[0])))
+        if not ok:
+            raise RuntimeError(f"{self.name} 力指令失败")
+
     def set_control_mode(self, mode: str) -> str:
         target = normalize_control_mode(mode)
         if self._enabled and target == self._mode:
@@ -205,7 +268,12 @@ class MarvinArmController(ArmController):
         else:
             if self._cur_state() not in (_POSITION, _TORQUE):
                 self._switch_position()
-            self._switch_impedance()
+            if target == "impedance":
+                self._switch_impedance()
+            elif target == "cartesian":
+                self._switch_cartesian()
+            else:
+                self._switch_force()
         self._mode = target
         self._enabled = True
         return target
@@ -236,6 +304,10 @@ class MarvinArmController(ArmController):
         self._switch_position()
         if mode == "impedance":
             self._switch_impedance()
+        elif mode == "cartesian":
+            self._switch_cartesian()
+        elif mode == "force":
+            self._switch_force()
         self._enabled = True
         self._mode = mode
 
@@ -278,6 +350,44 @@ class MarvinArmController(ArmController):
         )
         if not ok:
             raise RuntimeError(f"{self.name} 切到阻抗模式失败")
+        time.sleep(0.5)
+        self._wait_state(_TORQUE)
+
+    def _switch_cartesian(self) -> None:
+        if len(self._cart_K) != _DOF or len(self._cart_D) != _DOF:
+            raise ValueError(f"cart_K/cart_D 需要 {_DOF} 个数")
+        if self._cart_rot not in (0, 1, 2):
+            raise ValueError(f"cart_rot 只能是 0、1、2，得到 {self._cart_rot}")
+        if len(self._cart_para) != _DOF:
+            raise ValueError(f"cart_ctrl 需要 {_DOF} 个数，得到 {len(self._cart_para)}")
+        ok = self._with_sdk(
+            lambda robot: robot.set_imp_cart_state(
+                arm=self.arm_id,
+                velRatio=self._vel_ratio,
+                AccRatio=self._acc_ratio,
+                K=list(self._cart_K),
+                D=list(self._cart_D),
+                rot_type=self._cart_rot,
+                cart_ctrl_para=list(self._cart_para),
+            )
+        )
+        if not ok:
+            raise RuntimeError(f"{self.name} 切到笛卡尔阻抗失败")
+        time.sleep(0.5)
+        self._wait_state(_TORQUE)
+
+    def _switch_force(self) -> None:
+        if len(self._force_dir) != 6:
+            raise ValueError(f"force_dir 需要 6 个数，得到 {len(self._force_dir)}")
+        if self._force_adj_mm < 0:
+            raise ValueError(f"force_adj_mm 要 >= 0，得到 {self._force_adj_mm}")
+        direction = list(self._force_dir)
+        limit = float(self._force_adj_mm)
+        ok = self._with_sdk(
+            lambda robot: robot.set_imp_force_state(arm=self.arm_id, fx_dir=direction, fc_adj_lmt=limit)
+        )
+        if not ok:
+            raise RuntimeError(f"{self.name} 切到力控失败")
         time.sleep(0.5)
         self._wait_state(_TORQUE)
 

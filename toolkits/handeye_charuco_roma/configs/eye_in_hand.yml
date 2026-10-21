@@ -1,0 +1,46 @@
+# 眼在手上：左腕 cam_left 看固定在世界系的板。板不要装在法兰上。
+# ./scripts/run.sh --config configs/eye_in_hand.yml capture --out runs/eih_left
+# 或：./scripts/run.sh --setup eye_in_hand --side left capture --out runs/eih_left
+
+roma_root: null
+sdk_root: null
+kine_cfg: null
+
+arm_side: left
+arm_device: left_arm
+camera_device: cam_left
+setup: eye_in_hand
+camera_role: left_wrist
+
+board:
+  squares_x: 14
+  squares_y: 10
+  square_length_m: 0.040
+  marker_length_m: 0.028
+  dictionary: DICT_5X5_100
+  legacy_pattern: false
+  print_scale: 1.0
+
+capture:
+  min_corners: 8
+  max_reproj_px: 3.0
+  grab_frames: 4
+  min_samples: 12
+  display: false
+  ready_timeout_s: 15.0
+  settle_s: 1.0
+  gap_s: 1.0
+  replay_max_deg_s: 20.0
+
+solver:
+  refine: true
+  reject_outliers: true
+  refine_intrinsics: true
+  max_rms_trans_m: 0.008
+  max_rms_rot_deg: 1.5
+
+verify:
+  max_rms_trans_m: 0.008
+  max_rms_rot_deg: 1.5
+  max_rms_reproj_px: 4.0
+  max_rms_origin_m: 0.010

@@ -10,6 +10,7 @@ import time
 from scipy.spatial.transform import Rotation as R
 
 from robot.controller.arm_controller import ArmController
+from robot.controller.mit_command import pack_joint_mit
 from robot.controller.piper_gravity_config import (
     PiperTeleopGravityConfig,
     compute_piper_teleop_torque_terms,
@@ -47,6 +48,19 @@ def normalize_piper_firmware_version(firmware_version=PiperFW.V183):
         f"Unsupported Piper firmware version: {firmware_version!r}. "
         f"Expected one of {sorted(supported_versions)}."
     )
+
+
+def torque_from_motor_states(samples):
+    """pyAgxArm.get_motor_states().msg.torque，单位 N·m。缺一轴就返回 None。"""
+    if not samples:
+        return None
+    values = []
+    for sample in samples:
+        torque = getattr(getattr(sample, "msg", None), "torque", None)
+        if torque is None:
+            return None
+        values.append(float(torque))
+    return np.asarray(values, dtype=float)
 
 
 # 基于常驻线程的重力补偿遥操控制
@@ -166,6 +180,8 @@ class PiperAgxController(ArmController):
         self._joint_track_warn_error = float(os.environ.get("XONE_PIPER_TRACK_WARN_ERROR", "0.03"))
         self._gripper_track_warn_error = float(os.environ.get("XONE_PIPER_GRIPPER_TRACK_WARN_ERROR", "0.2"))
         self.teleop_gravity_config = None
+        self._gravity_pin = None
+        self._last_result = {}
         self._joint_feedback_counter = 0
         self._gripper_feedback_counter = 0
 
@@ -413,6 +429,9 @@ class PiperAgxController(ArmController):
         state["joint"] = np.array(joint)
         state["eef"] = np.array(eef)
         state["gripper"] = gripper * 10.
+        torque = self._read_joint_torque()
+        if torque is not None:
+            state["force"] = torque
         self._update_feedback_cache(state["joint"])
         self._maybe_log_joint_tracking(state["joint"])
         self._maybe_log_gripper_tracking(state["gripper"])
@@ -503,6 +522,95 @@ class PiperAgxController(ArmController):
             requested_gripper=gripper,
             command_width=target_width,
         )
+
+    def set_mit(self, q_des, kp, kd, qd_des=None, tau_ff=None):
+        """pyAgxArm.move_mit。驱动计算 kp (p_des - p) + kd (v_des - v) + t_ff。
+
+        不传 tau_ff 且已经 set_up 时，前馈用拖动示教同一份重力矩。
+        显式 MIT 会停掉重力线程，避免下一拍把这条命令盖掉。
+        """
+        self._require_arm()
+        dofs = int(self.controller.joint_nums)
+        if tau_ff is None and getattr(self, "urdf_path", None) is not None and self.teleop_gravity_config is not None:
+            tau_ff = self._gravity_feedforward()
+        parts = pack_joint_mit(q_des, kp, kd, qd_des, tau_ff, dofs)
+        self._yield_teleop()
+        for joint_id in range(1, dofs + 1):
+            index = joint_id - 1
+            self.controller.move_mit(
+                joint_id,
+                float(parts["q_des"][index]),
+                float(parts["qd_des"][index]),
+                float(parts["kp"][index]),
+                float(parts["kd"][index]),
+                float(parts["feedforward"][index]),
+            )
+        return parts
+
+    def set_force(self, force):
+        """纯关节力矩。SDK 的转矩控制是 kp = 0、kd = 0，t_ff 为力矩，单位 N·m。"""
+        self._require_arm()
+        dofs = int(self.controller.joint_nums)
+        torque = np.asarray(force, dtype=float).reshape(-1)
+        return self.set_mit(np.zeros(dofs), np.zeros(dofs), np.zeros(dofs), np.zeros(dofs), torque)
+
+    def get_information(self):
+        info = super().get_information()
+        if self.collect_info and "result" in self.collect_info:
+            info["result"] = self._last_result
+        return info
+
+    def handle_runtime_op(self, data: dict) -> None:
+        op = str(data.get("op") or "")
+        if op != "mit":
+            raise ValueError(f"未知操作 {op}")
+        dofs = int(self.controller.joint_nums)
+        parts = self.set_mit(
+            data.get("q_des", np.zeros(dofs)),
+            data.get("kp", np.zeros(dofs)),
+            data.get("kd", np.zeros(dofs)),
+            data.get("qd_des"),
+            data.get("tau_ff"),
+        )
+        self._last_result = {"kind": "mit", **{key: value.tolist() for key, value in parts.items()}}
+
+    def _yield_teleop(self):
+        if self._teleop_event is not None:
+            self._teleop_event.clear()
+        self.teleop = False
+
+    def _require_arm(self):
+        if self.controller is None:
+            raise RuntimeError(f"{self.name} 尚未连接")
+
+    def _gravity_feedforward(self):
+        if self._gravity_pin is None:
+            self._gravity_pin = AgxPinocchio(str(self.urdf_path))
+        cached = self.get_cached_feedback(max_age_s=0.2)
+        if cached is None:
+            self.get_state()
+            cached = self.get_cached_feedback(max_age_s=0.2)
+        if cached is None:
+            raise RuntimeError(f"{self.name} 没有关节反馈，不能算重力前馈")
+        raw = self._gravity_pin.gravity_compensation(
+            cached["joint"],
+            cached["joint_velocities"],
+            np.eye(3),
+            include_velocity_bias=False,
+        )
+        return compute_piper_teleop_torque_terms(raw, self.teleop_gravity_config)["gravity_ff"]
+
+    def _read_joint_torque(self):
+        getter = getattr(self.controller, "get_motor_states", None)
+        if getter is None:
+            return None
+        samples = []
+        try:
+            for joint_id in range(1, int(self.controller.joint_nums) + 1):
+                samples.append(getter(joint_id))
+        except (AttributeError, TypeError, ValueError):
+            return None
+        return torque_from_motor_states(samples)
 
     def change_mode(self, teleop):
         if self.teleop == teleop:

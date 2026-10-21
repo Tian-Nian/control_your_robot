@@ -1,0 +1,11 @@
+[project]
+name = "handeye-charuco-roma"
+version = "0.1.0"
+description = "Charuco hand-eye capture on roma Observe (does not replace handeye_charuco)"
+requires-python = ">=3.10"
+dependencies = ["numpy<2.0", "scipy", "opencv-python", "pyyaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "../handeye_charuco"]
+addopts = "-q"

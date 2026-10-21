@@ -18,7 +18,20 @@ from robot.runtime.safety import engage_safe_stop
 from robot.runtime.transport import Bus
 
 _CONTROL_MODES = frozenset(
-    {"impedance", "imp", "imp_joint", "teleop", "teleop_imp", "position", "pos"}
+    {
+        "impedance",
+        "imp",
+        "imp_joint",
+        "teleop",
+        "teleop_imp",
+        "position",
+        "pos",
+        "cartesian",
+        "imp_cart",
+        "cart",
+        "force",
+        "imp_force",
+    }
 )
 
 
@@ -450,7 +463,9 @@ def _start_joint(spec: dict, component, goal, seq: int) -> None:
 
 def _apply_mode(component, mode) -> None:
     if str(mode).strip().lower() not in _CONTROL_MODES:
-        raise CommandRejected(f"control_mode 只能是 impedance 或 position，得到 {mode!r}")
+        raise CommandRejected(
+            f"control_mode 只能是 position、impedance、cartesian 或 force，得到 {mode!r}"
+        )
     move = getattr(component, "move", None)
     if move is not None:
         move({"control_mode": mode}, is_delta=False)
