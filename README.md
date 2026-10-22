@@ -3,7 +3,7 @@
 
 # control_your_robot
 
-This branch runs robot controllers and sensors as a shared-memory service. A client reads each component's latest observation and sends commands by component name. `main` still has the collect / deploy stack. This branch does not.
+This branch runs robot controllers and sensors as a shared-memory service. A client reads each component's latest observation and sends commands by component name. Joint teleop, HDF5 collection, and XPolicyLab deployment all attach to that service.
 
 ```bash
 pip install -e .
@@ -29,6 +29,10 @@ Hardware is optional. `config/runtime/test_robot.yml` uses in-process test devic
 | `cyr echo NAME` | Print one component's latest raw observation. Images stay summarized |
 | `cyr snapshot` | Print every component as one JSON line. Long arrays are summarized |
 | `cyr call NAME JSON` | Send one command. Exit 0 only when `accepted` is true |
+| `cyr teleop --source SRC --follower NAME` | Copy `joint` and `gripper` from the source onto the follower. Holds the control lock |
+| `cyr collect --task TASK` | Record the latest observations to `save/TASK/N.hdf5`. Read only |
+| `cyr replay --file PATH` | Play joints from a collect file or an xspark file through the deploy action path |
+| `cyr deploy --policy NAME` | Call `XPolicyLab.policy.NAME.deploy.eval_one_episode` on this service |
 
 ```bash
 cyr call left_arm '{"op":"reset"}'
@@ -40,7 +44,70 @@ cyr call left_arm '{"control_mode":"gravity_compensation"}'
 
 `cyr hmi`: `q` leaves the UI. `x`, then `y` or Enter, stops every running service. `n` cancels that prompt. Up / down or `k` / `j` move the selection.
 
-The CLI attaches to the only live service. If more than one is running, `echo`, `snapshot`, and `call` fail and ask you to use `Session.attach(name)` from Python.
+The CLI attaches to the only live service. If more than one is running, `echo`, `snapshot`, `call`, `teleop`, `collect`, `replay`, and `deploy` fail and ask you to use `Session.attach(name)` from Python.
+
+## Teleop, collection, and XPolicyLab
+
+These commands use a service that is already running. They do not start one. A service left over from an older shared-memory layout has to be rebuilt with `cyr restart` before teleop or deployment. `cyr hmi` can still read that older segment.
+
+Teleop, deployment, and replay each hold one service-wide control lock. The holder is the only client that may write joint, end-effector, gripper, and reset targets. Another process that tries to write gets `accepted: false` and a warning that names the holder (`遥操`, `部署`, or `回放`). `snapshot`, `echo`, `get_obs`, and collection keep reading. The holder renews the lock with a heartbeat. The lock drops when that process exits or the heartbeat stops, and the arm then stops chasing the last streamed target. While nobody holds the lock, a one-shot `cyr call` still writes.
+
+### Joint teleop
+
+`cyr teleop` copies the source component's `joint` and `gripper` onto the follower. Both names have to be components of the same service.
+
+```bash
+cyr teleop --source master_arm --follower left_arm --rate 50 --lease 2
+```
+
+`--rate` is how often the latest target is stored. The default is 50 Hz. `--lease` is the lock timeout in seconds. The default is 2. Ctrl+C releases the lock. The follower applies the stored target on its own tick. When the component has `max_step_rad`, each tick moves at most that far. `config/runtime/piper_sim.yml` publishes only `left_arm`, so teleop needs a second component that publishes `joint`.
+
+### Collection
+
+`cyr collect` reads the latest frame from every component. It does not take the control lock, send motion, or reset the arm. Home the arm yourself before the first Enter.
+
+```bash
+cyr call left_arm '{"op":"reset","start_state":[0, 1.3, -1, 0, 0.5, 0]}'
+cyr collect --task pick --out save --freq 30
+```
+
+Press Enter to start writing, and Enter again to finish. `--freq` is the save rate, default 30 Hz. The episode is `save/pick/0.hdf5`, then `1.hdf5`, and so on. Each component is a group. Each published field is a dataset. `skew_ms` is the spread of the timestamps in that sample, in milliseconds. `save/pick/config.json` lists the field names.
+
+A uint8 `color` or `image` with shape HxWx3 is stored as JPEG. The array in memory is RGB. Encoding matches XPolicyLab `encode_image_bit`: OpenCV receives one RGB-to-BGR conversion, and the file carries the `XPL-RGB1` comment so `decode_image_bit` returns RGB. Bytes that are already encoded are stored as they are, without a new comment.
+
+The training layout is a separate step. `action[t]` is `state[t+1]`, so the file needs at least two frames.
+
+```python
+from robot.data.xspark import to_xspark
+
+to_xspark("save/pick/0.hdf5", "save/pick_xspark.hdf5", instruction="pick up the cup", frequency=30)
+```
+
+Arm `joint` becomes `{side}_arm_joint_state`, `eef` becomes `{side}_ee_pose` (xyz + wxyz, length 7), and `gripper` becomes `{side}_ee_joint_state`. A `{side}_hand` joint overwrites that end-effector joint state. The file attributes are `instruction`, `frequency`, and `data_format_version` `v1.0`.
+
+### Replay
+
+```bash
+cyr replay --file save/pick/0.hdf5 --hz 30
+```
+
+Replay holds the lock as `回放` and sends every step through the same `take_action` as deployment. It leaves the arm where it is. An xspark file is read from the `action` group. A raw collect file is read from each arm's `joint` and `gripper`.
+
+### XPolicyLab
+
+`cyr deploy` builds a `RuntimeEnv` and calls `XPolicyLab.policy.<name>.deploy.eval_one_episode`. Put the directory that contains the `XPolicyLab` package on `PYTHONPATH`. The policy server must already be listening. The default address is `127.0.0.1:9999`.
+
+```bash
+PYTHONPATH=/path/to/X-Robot-Pipeline_deploy \
+  cyr deploy --policy FTP_1_v3_joint --instruction "put the cup in the box" \
+  --hz 25 --steps 200 --host 127.0.0.1 --port 9999
+```
+
+`RuntimeEnv` is the `TASK_ENV` that loop already uses: `get_obs`, `take_action`, `is_episode_end`, and `reset`. This client resets every command-accepting `*_arm` before `eval_one_episode`. The policy module then calls `model_client.call("reset")` for its own state. The command-line path is joint mode. `--hz` defaults to 25. `--steps 0` does not end the episode from a step count, so pass the number of steps to run. `--lease` defaults to 2 seconds, and the lock role is `部署`. If teleop or replay already holds the lock, deploy stops before the policy loop.
+
+`get_obs()` returns `left_arm_joint_state`, `left_ee_pose` (xyz + wxyz, length 7), and `left_ee_joint_state`, plus the right-side names when those components exist. On a gripper arm, `left_ee_joint_state` is the gripper scalar. A 20-joint `{side}_hand` publication replaces it. Camera `color` is JPEG bytes carrying `XPL-RGB1`. The policy server's `decode_image_bit` turns that buffer into RGB. The observation also has `instruction`, `additional_info.frequency`, and `data_format_version` `v1.0`.
+
+`take_action` stores the latest target and then sleeps for `1/hz`. A length-1 `*_ee_joint_state` is sent as that arm's gripper. A length-20 vector stays on the hand. Action chunks stay inside the policy module.
 
 ## What `accepted` means
 
@@ -231,7 +298,10 @@ The Marvin URDF and `pinocchio` tests skip when those are absent.
 | Path | Content |
 |------|---------|
 | `src/robot/runtime/` | Service, shared memory, session API, `cyr`, HMI |
-| `src/robot/harness/` | Body model, command gate, joint tracking, action contract, aligned observation, episode log |
+| `src/robot/data/` | HDF5 collection, xspark conversion, standard RGB JPEG |
+| `src/robot/teleop/` | Joint master-slave follower |
+| `src/robot/deploy/` | TCP client for an XPolicyLab policy server |
+| `src/robot/harness/` | Body model, command gate, joint tracking, action contract, `RuntimeEnv`, episode log |
 | `src/robot/controller/` | Arm, mobile, dexterous-hand, and test controllers |
 | `src/robot/sensor/` | Cameras, tactile sensors, and test sensors |
 | `config/runtime/` | `test_robot.yml`, `piper_sim.yml`, `piper_sim_gravity.yml`, `piper_sim_impedance.yml`, `marvin_lab.yml` |
@@ -239,7 +309,7 @@ The Marvin URDF and `pinocchio` tests skip when those are absent.
 | `toolkits/` | Gravity compensation, joint impedance, Charuco hand-eye |
 | `third_party/` | Vendor libraries |
 | `agent.md` | Notes for coding agents |
-| `developer_README.md` | Where the old collect / deploy notes went |
+| `developer_README.md` | Why the old `my_robot/` layout stays on `main` |
 
 # WECHAT
 

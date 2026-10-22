@@ -3,7 +3,7 @@
 
 # 控制你的机器人
 
-这个分支把控制器和传感器跑成一个共享内存服务。客户端按组件名读最新观测，并下发指令。`main` 仍是采集和部署栈。这个分支里没有那套入口。
+这个分支把控制器和传感器跑成一个共享内存服务。客户端按组件名读最新观测，并下发指令。关节遥操、HDF5 采集和 XPolicyLab 部署都接在这台服务上。
 
 ```bash
 pip install -e .
@@ -29,6 +29,10 @@ cyr stop
 | `cyr echo NAME` | 打印一个组件的最新原始观测。图像只显示形状 |
 | `cyr snapshot` | 把全部组件打成一行 JSON。长数组只留形状 |
 | `cyr call NAME JSON` | 发送一条指令。退出码 0 只在 `accepted` 为真时出现 |
+| `cyr teleop --source SRC --follower NAME` | 把源组件的 `joint` 和 `gripper` 抄给从臂，并持有控制锁 |
+| `cyr collect --task TASK` | 把最新观测写成 `save/TASK/N.hdf5`。只读 |
+| `cyr replay --file PATH` | 用采集文件或 xspark 文件里的关节，走部署的动作通道 |
+| `cyr deploy --policy NAME` | 在这台服务上调用 `XPolicyLab.policy.NAME.deploy.eval_one_episode` |
 
 ```bash
 cyr call left_arm '{"op":"reset"}'
@@ -40,7 +44,70 @@ cyr call left_arm '{"control_mode":"gravity_compensation"}'
 
 `cyr hmi`：`q` 退出界面。`x` 之后按 `y` 或回车，会停掉当前所有服务。`n` 取消。方向键或 `k` / `j` 移动选中项。
 
-命令行只附着唯一的一台服务。同时跑多台时，`echo`、`snapshot`、`call` 会失败。这时用 Python 的 `Session.attach(name)`。
+命令行只附着唯一的一台服务。同时跑多台时，`echo`、`snapshot`、`call`、`teleop`、`collect`、`replay`、`deploy` 会失败。这时用 Python 的 `Session.attach(name)`。
+
+## 遥操、采集和 XPolicyLab
+
+这些命令用的是已经跑着的服务，自己不会把服务拉起来。旧版共享内存上留下的服务，要先 `cyr restart` 才能遥操或部署。`cyr hmi` 仍可以读旧段。
+
+遥操、部署和回放各持有一把服务级控制锁。持有者是唯一可以写关节、末端、夹爪和复位的客户端。别的进程再写，会得到 `accepted: false`，并打出一条带持有者名字的 warning（`遥操`、`部署` 或 `回放`）。`snapshot`、`echo`、`get_obs` 和采集照常读。持有者用心跳续租。进程退出或心跳停掉之后锁放开，臂也不再追最后那个流式目标。没有人持锁时，单次 `cyr call` 仍然可以写。
+
+### 关节遥操
+
+`cyr teleop` 把源组件的 `joint` 和 `gripper` 抄到从臂。两个名字必须是同一台服务里的组件。
+
+```bash
+cyr teleop --source master_arm --follower left_arm --rate 50 --lease 2
+```
+
+`--rate` 是写入最新目标的频率，默认 50 Hz。`--lease` 是锁的超时，单位秒，默认 2。Ctrl+C 会放开锁。从臂在自己的节拍上跟上这份目标。组件配了 `max_step_rad` 时，每一拍最多走这么远。`config/runtime/piper_sim.yml` 只发布 `left_arm`，遥操还需要第二个发布 `joint` 的组件。
+
+### 采集
+
+`cyr collect` 读每个组件的最新帧。它不拿控制锁，不发运动，也不复位。第一次回车之前，先自己把臂回到准备姿态。
+
+```bash
+cyr call left_arm '{"op":"reset","start_state":[0, 1.3, -1, 0, 0.5, 0]}'
+cyr collect --task pick --out save --freq 30
+```
+
+按一次回车开始写，再按一次结束。`--freq` 是存盘频率，默认 30 Hz。文件是 `save/pick/0.hdf5`，之后是 `1.hdf5`，依次递增。每个组件是一个 group，每个发布字段是一个 dataset。`skew_ms` 是这一拍各组件时间戳的最大差，单位毫秒。`save/pick/config.json` 列出字段名。
+
+形状为 HxWx3 的 uint8 `color` 或 `image` 存成 JPEG。内存里的数组是 RGB。编码和 XPolicyLab 的 `encode_image_bit` 一致：交给 OpenCV 前做一次 RGB 到 BGR，文件里带 `XPL-RGB1` 注释，这样 `decode_image_bit` 读回来仍是 RGB。已经是编码字节的图像原样写入，不再补注释。
+
+训练用的布局是另一步。`action[t]` 定义成 `state[t+1]`，所以至少要有两帧。
+
+```python
+from robot.data.xspark import to_xspark
+
+to_xspark("save/pick/0.hdf5", "save/pick_xspark.hdf5", instruction="拿起杯子", frequency=30)
+```
+
+臂的 `joint` 写成 `{side}_arm_joint_state`，`eef` 写成 `{side}_ee_pose`（xyz + wxyz，长度 7），`gripper` 写成 `{side}_ee_joint_state`。`{side}_hand` 的关节会覆盖这份末端关节。文件属性是 `instruction`、`frequency` 和 `data_format_version` `v1.0`。
+
+### 回放
+
+```bash
+cyr replay --file save/pick/0.hdf5 --hz 30
+```
+
+回放以 `回放` 的身份持锁，每一步走和部署相同的 `take_action`。它不先复位。xspark 文件读 `action` 组。原始采集文件读各臂的 `joint` 和 `gripper`。
+
+### XPolicyLab
+
+`cyr deploy` 建立 `RuntimeEnv`，再调用 `XPolicyLab.policy.<名字>.deploy.eval_one_episode`。把含有 `XPolicyLab` 包的目录放进 `PYTHONPATH`。策略服务要先在端口上听着，默认 `127.0.0.1:9999`。
+
+```bash
+PYTHONPATH=/path/to/X-Robot-Pipeline_deploy \
+  cyr deploy --policy FTP_1_v3_joint --instruction "把杯子放进盒子" \
+  --hz 25 --steps 200 --host 127.0.0.1 --port 9999
+```
+
+`RuntimeEnv` 就是这条循环原来用的 `TASK_ENV`：`get_obs`、`take_action`、`is_episode_end`、`reset`。客户端在进入 `eval_one_episode` 之前，复位每一个接受命令且名字以 `_arm` 结尾的组件。策略模块再用 `model_client.call("reset")` 清自己的状态。命令行这条路径是关节模式。`--hz` 默认 25。`--steps 0` 不会按步数结束，所以要写出打算跑的步数。`--lease` 默认 2 秒，锁的角色是 `部署`。遥操或回放已经拿着锁时，部署在策略循环开始前就停下来。
+
+`get_obs()` 给出 `left_arm_joint_state`、`left_ee_pose`（xyz + wxyz，长度 7）和 `left_ee_joint_state`；右边有对应组件时同样给出。夹爪臂上的 `left_ee_joint_state` 是夹爪标量。20 维的 `{side}_hand` 关节会换成这份末端关节。相机 `color` 是带 `XPL-RGB1` 的 JPEG 字节。策略服务里的 `decode_image_bit` 把它解成 RGB。观测里还有 `instruction`、`additional_info.frequency` 和 `data_format_version` `v1.0`。
+
+`take_action` 写下最新目标，然后睡 `1/hz`。长度为 1 的 `*_ee_joint_state` 作为该臂的夹爪发出。长度为 20 的向量留给手。动作块留在策略模块里。
 
 ## `accepted` 是什么意思
 
@@ -231,7 +298,10 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest src/robot/runtime/tests src/ro
 | 路径 | 内容 |
 |------|------|
 | `src/robot/runtime/` | 服务、共享内存、会话接口、`cyr`、终端界面 |
-| `src/robot/harness/` | 身体模型、命令门控、关节跟踪、动作合同、对齐观测、episode 记录 |
+| `src/robot/data/` | HDF5 采集、xspark 转换、标准 RGB JPEG |
+| `src/robot/teleop/` | 关节主从 |
+| `src/robot/deploy/` | 连接 XPolicyLab 策略服务的 TCP 客户端 |
+| `src/robot/harness/` | 身体模型、命令门控、关节跟踪、动作合同、`RuntimeEnv`、episode 记录 |
 | `src/robot/controller/` | 机械臂、底盘、灵巧手和测试控制器 |
 | `src/robot/sensor/` | 相机、触觉和测试传感器 |
 | `config/runtime/` | `test_robot.yml`、`piper_sim.yml`、`piper_sim_gravity.yml`、`piper_sim_impedance.yml`、`marvin_lab.yml` |
@@ -239,4 +309,4 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest src/robot/runtime/tests src/ro
 | `toolkits/` | 重力补偿、关节阻抗、Charuco 手眼 |
 | `third_party/` | 厂商库 |
 | `agent.md` | 给编码代理的说明 |
-| `developer_README.md` | 旧的采集 / 部署说明去了哪里 |
+| `developer_README.md` | 为什么旧的 `my_robot/` 目录仍留在 `main` |
