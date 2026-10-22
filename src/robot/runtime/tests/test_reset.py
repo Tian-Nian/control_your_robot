@@ -1,14 +1,27 @@
 import numpy as np
 
 
-def test_controllers_reset_to_zero_or_given_pose():
+def test_controllers_reset_to_zero_or_given_pose(monkeypatch):
+    from robot.controller import controller as controller_mod
     from robot.controller.TestArm_controller import TestArmController
     from robot.controller.TestMobile_controller import TestMobileController
 
+    monkeypatch.setattr(controller_mod.time, "sleep", lambda *_args, **_kwargs: None)
     arm = TestArmController("left_arm", DoFs=6, INFO="ERROR")
     arm.set_up()
     arm.move({"joint": np.ones(6)})
+    sent = []
+    original = arm.set_joint
+
+    def record(joint):
+        sent.append(np.asarray(joint, dtype=float).copy())
+        original(joint)
+
+    arm.set_joint = record
     arm.reset()
+    assert len(sent) > 2
+    steps = np.max(np.abs(np.diff(np.stack(sent), axis=0)), axis=1)
+    assert float(steps.max()) < 0.1
     assert np.allclose(arm.get_state()["joint"], np.zeros(6))
     arm.reset(np.full(6, 0.2))
     assert np.allclose(arm.get_state()["joint"], np.full(6, 0.2))

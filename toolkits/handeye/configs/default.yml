@@ -1,0 +1,20 @@
+# 板参数与 toolkits/handeye_charuco_roma/configs/default.yml 一致。
+# 相机内参、眼在手上还是眼在手外、组件名由检查问用户后再填。
+
+arm: null
+camera: null
+setup: null                 # eye_in_hand 或 eye_to_hand
+camera_matrix: null         # 3x3，像素
+dist_coeffs: [0, 0, 0, 0, 0]
+
+board:
+  squares_x: 14
+  squares_y: 10
+  square_length_m: 0.040
+  marker_length_m: 0.028
+  dictionary: DICT_5X5_100
+  legacy_pattern: false
+
+capture:
+  min_corners: 8
+  min_samples: 12

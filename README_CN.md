@@ -14,7 +14,7 @@ cyr stop
 
 要用本仓库安装出来的 `cyr`。Debian 上的 `/usr/bin/cyr` 是另一个程序。用 `which cyr` 确认。
 
-没有硬件也能跑。`config/runtime/test_robot.yml` 用进程内的测试设备。`config/runtime/marvin_lab.yml` 是天机实验台。
+没有硬件也能跑。`config/runtime/test_robot.yml` 用进程内的测试设备。`config/runtime/piper_sim.yml` 是 Piper 仿真，默认位置模式。重力和阻抗分别用 `piper_sim_gravity.yml`、`piper_sim_impedance.yml`。`config/runtime/marvin_lab.yml` 是天机实验台。
 
 ## 命令
 
@@ -31,11 +31,11 @@ cyr stop
 | `cyr call NAME JSON` | 发送一条指令。退出码 0 只在 `accepted` 为真时出现 |
 
 ```bash
-cyr call left_arm '{"joint":[0,0,0,0,0,0]}'
 cyr call left_arm '{"op":"reset"}'
-cyr call left_arm '{"joint":[0,0,0,0,0,0]}' --delta
+cyr call left_arm '{"joint":[0, 1.3, -1, 0, 0.5, 0]}'
+cyr call left_arm '{"joint":[0, 0.05, 0, 0, 0, 0]}' --delta
 cyr call left_arm '{"op":"release"}'
-cyr call left_arm '{"joint":[0,0,0,0,0,0]}' --timeout 15
+cyr call left_arm '{"control_mode":"gravity_compensation"}'
 ```
 
 `cyr hmi`：`q` 退出界面。`x` 之后按 `y` 或回车，会停掉当前所有服务。`n` 取消。方向键或 `k` / `j` 移动选中项。
@@ -65,14 +65,14 @@ session = Session.attach()                 # 或多台时 Session.attach("marvin
 session.describe()
 session.snapshot()                         # 图像和长度超过 8 的数组只留形状
 session.read_raw("cam_head")               # 保留像素
-session.call("left_arm", {"joint": [0, 0, 0, 0, 0, 0]}, timeout=15)
-session.reset("left_arm", timeout=15)
+session.reset("left_arm")
+session.call("left_arm", {"joint": [0, 1.3, -1, 0, 0.5, 0]}, timeout=15)
 session.close()
 ```
 
 `attach(name)` 按服务的 `name` 或 `shm_name` 选择。只有一台时可以不写名字。多台时必须写。
 
-`call` 先在 `timeout`（默认 2 秒）内等节点取走命令。这条命令一旦进入关节跟踪，等待会延长到该组件的 `motion.timeout_s` 再加 0.5 秒。超时要留够节点取出命令的时间。实验台天机臂的跟踪上限是 12 秒，长距离运动用 `--timeout 15` 或 `timeout=15`。
+`call` 先在 `timeout`（默认 2 秒）内等节点取走命令。这条命令一旦进入关节跟踪，等待会延长到该组件的 `motion.timeout_s` 再加 0.5 秒。`Session.reset` 默认等 15 秒。`cyr call` 遇到 `{"op":"reset"}` 且没有另给 `--timeout` 时，也等 15 秒。复位在控制器里把整段轨迹发完才返回。实验台天机臂的跟踪上限是 12 秒，长距离运动用 `--timeout 15` 或 `timeout=15`。
 
 ## 策略用的 harness
 
@@ -137,11 +137,48 @@ session.close()
 
 `motion.enabled` 为真时，关节目标按 `max_step_rad`（默认 0.05）一步步走近，直到反馈进入 `tol_rad`（默认 0.02），或 `timeout_s` 到期。第一拍之前会把整段关节空间轨迹拿去查限位和间隙。超时只让这个组件保持当前位置，不锁存整台服务。
 
-`{"op":"release"}` 解除保持。`{"op":"reset"}` 走到 `start_state`；没给 `start_state` 时走到身体文件里的 `home`。开了跟踪时，复位走同一条限速轨迹。
+`{"op":"release"}` 解除保持。`{"op":"reset"}` 调用控制器的 `reset`。不要用 `{"joint":[0,0,...]}` 回零：位置模式下这一条会直接把目标设成零位。
+
+复位从当前关节做 smootherstep，峰值关节速度 1.7 rad/s，最短 0.8 秒，每拍调用 `set_joint`。已经在目标上就只发一次当前关节。臂若停在阻抗或重力补偿，会先切回 `position`，否则有的 `set_joint` 不会带动关节。可选 `start_state` 是目标关节。没给时，有身体文件就用其中的 `home`，否则用控制器自己的 `_home` 或 `_init_pose`，再没有才是零位。下发前若配置了门控，整段轨迹会先查限位和间隙。
+
+```bash
+cyr call left_arm '{"op":"reset"}'
+cyr call left_arm '{"op":"reset","start_state":[0, 1.3, -1, 0, 0.5, 0]}'
+```
 
 组件有身体模型、命令里只有 `eef` 没有 `joint` 时，只按位置做逆解。四元数不参与求解。`eef` 的 `--delta` 加在当前法兰位姿上再逆解。`joint` 的 `--delta` 先加成绝对关节，再做门控。
 
-`control_mode` 接受 `impedance`（`imp`、`imp_joint`、`teleop`、`teleop_imp`）和 `position`（`pos`）。关节门控通过之后才会切换模式。
+## 伺服模式
+
+`setup.control_mode` 传给 `set_up`。运行中用 `cyr call NAME '{"control_mode":"..."}'` 切换。每个臂只实现自己的 `supported_modes`，不支持的名字会报错并列出它实际有的模式。别名：`pos`、`mit_control`、`gravity`、`imp`、`imp_joint`、`teleop`、`teleop_imp`、`cart`、`imp_cart`、`imp_force`。
+
+| 模式 | 谁有 | 主机做什么 |
+|------|------|------------|
+| `position` | 各臂 | 关节目标交给驱动或仿真。PiperSim 在这个模式下会直接改到目标 |
+| `mit` | Piper、PiperAgx、Y1、PiperSim | 下发 `kp`、`kd`、`q_des`、`qd_des`、`tau_ff` |
+| `gravity_compensation` | 能发关节 MIT、并且有 URDF 的臂 | `kp = 0`，`kd` 用该臂的小阻尼，`tau_ff` 是连杆重力加辨识出的法兰负载。真机再乘 `torque_scale`。主机不积分 |
+| `impedance` | 同上，外加 Marvin | MIT 臂的 `kp`、`kd` 用配置里的 `joint_K`、`joint_D`，`tau_ff` 仍是那份重力。真机不套用仿真默认的 K、D |
+| `cartesian`、`force` | Marvin | 驱动自己的笛卡尔阻抗和末端力，不改名成上面四种 |
+
+能发关节 MIT 的臂继承 `MitServo`。Piper 和 Y1 在控制周期里刷新指令。PiperAgx 仍用原来的 200 Hz 线程，不再另算一份 URDF 重力。没有 URDF 时，重力和阻抗会被拒绝。Piper 的 URDF 写在 `setup.urdf`。Marvin 没有关节 MIT，阻抗用 `set_imp_joint_state`，负载用 `set_tool` 的 10 个工具动力学参数。
+
+## 工具包
+
+说明在 `toolkits/<name>/agent.md`。先跑该目录的 `check.py`，不通过就按它打印的问题处理。
+
+重力补偿辨识的是法兰负载的质量 `m` 和质心 `c`，不是惯量。臂先停在 `position`，用 `cyr call` 下发至少 8 个腕朝向差得开的关节目标，停稳后 `collect.py` 记力矩。残差是测到的力矩减去连杆 `g(q)`。结果用 `{"op":"set_payload"}` 写回，再切到 `gravity_compensation`。换夹爪后重新采集。负载已经写在 URDF 里时，检查加 `--tool-in-urdf`，不必采集。
+
+关节阻抗不辨识 K、D。真机把 `joint_K` 和 `joint_D` 写在 `setup` 里。仿真默认值只属于 `piper_sim_impedance.yml`。
+
+```bash
+cyr start --config config/runtime/piper_sim_gravity.yml
+python toolkits/gravity_compensation/check.py --tool-in-urdf
+python toolkits/gravity_compensation/collect.py --service piper_sim --arm left_arm
+cyr start --config config/runtime/piper_sim_impedance.yml
+python toolkits/impedance/check.py
+```
+
+手眼在 `toolkits/handeye/`。PiperSim 没有相机，检查会要求相机名和眼在手上还是眼在手外。`toolkits/handeye_charuco_roma/` 是原来的采集前端，保持不动。
 
 ## 身体文件
 
@@ -163,7 +200,7 @@ session.close()
 ```bash
 cyr start --config config/runtime/marvin_lab.yml
 cyr call left_arm '{"control_mode":"position"}'
-cyr call left_hand '{"joint":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}'
+cyr call left_hand '{"op":"reset"}'
 cyr call left_arm '{"op":"reset"}' --timeout 15
 ```
 
@@ -197,8 +234,9 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest src/robot/runtime/tests src/ro
 | `src/robot/harness/` | 身体模型、命令门控、关节跟踪、动作合同、对齐观测、episode 记录 |
 | `src/robot/controller/` | 机械臂、底盘、灵巧手和测试控制器 |
 | `src/robot/sensor/` | 相机、触觉和测试传感器 |
-| `config/runtime/` | `test_robot.yml`、`marvin_lab.yml` |
+| `config/runtime/` | `test_robot.yml`、`piper_sim.yml`、`piper_sim_gravity.yml`、`piper_sim_impedance.yml`、`marvin_lab.yml` |
 | `config/bodies/` | 门控和 harness 用的身体描述 |
+| `toolkits/` | 重力补偿、关节阻抗、Charuco 手眼 |
 | `third_party/` | 厂商库 |
 | `agent.md` | 给编码代理的说明 |
 | `developer_README.md` | 旧的采集 / 部署说明去了哪里 |

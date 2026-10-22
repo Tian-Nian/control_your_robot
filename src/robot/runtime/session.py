@@ -37,6 +37,9 @@ class Session:
         return [
             {
                 "name": item.name,
+                "class_path": item.class_path,
+                "class_name": item.class_name,
+                "setup": dict(item.setup),
                 "publish": list(item.publish),
                 "rate_hz": item.rate_hz,
                 "accepts_commands": _accepts_commands(item.class_path),
@@ -66,7 +69,7 @@ class Session:
             return _result(False, None, str(exc), None)
         return self._wait(name, seq, timeout)
 
-    def reset(self, name: str, start_state=None, timeout: float = 2.0) -> dict:
+    def reset(self, name: str, start_state=None, timeout: float = 15.0) -> dict:
         payload = {"op": "reset"}
         if start_state is not None:
             payload["start_state"] = start_state

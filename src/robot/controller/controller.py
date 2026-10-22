@@ -6,6 +6,12 @@ import time
 from robot.utils.base.data_handler import debug_print
 
 class Controller(ABC):
+    SMOOTHERSTEP_PEAK = 15.0 / 8.0
+    _RESET_HZ = 50.0
+    _RESET_MIN_DURATION_S = 0.8
+    _RESET_MAX_JOINT_SPEED_RAD_S = 1.7
+    _RESET_WARN_DURATION_S = 3.0
+
     def __init__(self, timestamp=True):
         self.name = "controller"
         self.controller_type = "base_controller"
@@ -53,6 +59,82 @@ class Controller(ABC):
             debug_print(self.name, "安全保护已触发，拒绝复位", "WARNING")
             return
         return self.apply_reset(start_state)
+
+    @staticmethod
+    def smootherstep(u: float) -> float:
+        """两端速度为零：u^3 (6u^2 - 15u + 10)。"""
+        u = float(np.clip(u, 0.0, 1.0))
+        return u * u * u * (u * (u * 6.0 - 15.0) + 10.0)
+
+    @classmethod
+    def iter_smootherstep(cls, duration: float, hz: float):
+        """按绝对时间给出 smootherstep 采样。"""
+        duration = float(duration)
+        hz = float(hz)
+        if not np.isfinite(duration) or duration < 0.0:
+            raise ValueError("轨迹时长必须是有限的非负数")
+        if not np.isfinite(hz) or hz <= 0.0:
+            raise ValueError("轨迹频率必须是有限的正数")
+        n_steps = max(int(np.ceil(duration * hz)), 1)
+        started = time.monotonic()
+        for step in range(1, n_steps + 1):
+            remaining = started + step * duration / n_steps - time.monotonic()
+            if remaining > 0.0:
+                time.sleep(remaining)
+            yield cls.smootherstep(step / n_steps)
+
+    @classmethod
+    def smootherstep_joint_duration(cls, start_joint, target_joint, *, max_joint_speed: float) -> float:
+        """按 smootherstep 的峰值速度，给出最短时长。"""
+        start = np.asarray(start_joint, dtype=float).reshape(-1)
+        target = np.asarray(target_joint, dtype=float).reshape(-1)
+        max_joint_speed = float(max_joint_speed)
+        if start.size == 0 or start.shape != target.shape:
+            raise ValueError("复位的起点和终点关节长度必须相同，且不能为空")
+        if not np.all(np.isfinite(start)) or not np.all(np.isfinite(target)):
+            raise ValueError("复位关节必须是有限数")
+        if not np.isfinite(max_joint_speed) or max_joint_speed <= 0.0:
+            raise ValueError("复位关节速度必须是有限的正数")
+        max_delta = float(np.max(np.abs(target - start)))
+        return max_delta * cls.SMOOTHERSTEP_PEAK / max_joint_speed
+
+    def execute_joint_smootherstep(self, start_joint, target_joint, *, duration: float, hz: float) -> None:
+        """整段关节轨迹都通过 set_joint 下发。"""
+        start = np.asarray(start_joint, dtype=float).reshape(-1)
+        target = np.asarray(target_joint, dtype=float).reshape(-1)
+        if start.size == 0 or start.shape != target.shape:
+            raise ValueError("复位的起点和终点关节长度必须相同，且不能为空")
+        if not np.all(np.isfinite(start)) or not np.all(np.isfinite(target)):
+            raise ValueError("复位关节必须是有限数")
+        delta = target - start
+        for alpha in self.iter_smootherstep(duration, hz):
+            if getattr(self, "_cyr_safety_stopped", False):
+                return
+            self.set_joint(start + alpha * delta)
+
+    def interpolate_set_joint(self, current, start_state) -> None:
+        """从当前关节平滑走到目标。没给目标时用 _home、_init_pose，再不行就用零位。"""
+        start = np.asarray(current, dtype=float).reshape(-1)
+        if start_state is None:
+            home = getattr(self, "_home", None)
+            if home is None:
+                home = getattr(self, "_init_pose", None)
+            target = np.zeros(start.size) if home is None else np.asarray(home, dtype=float).reshape(-1)
+        else:
+            target = np.asarray(start_state, dtype=float).reshape(-1)
+        if float(np.max(np.abs(target - start))) < 1e-6:
+            self.set_joint(target)
+            return
+        duration = self.smootherstep_joint_duration(
+            start,
+            target,
+            max_joint_speed=self._RESET_MAX_JOINT_SPEED_RAD_S,
+        )
+        duration = max(self._RESET_MIN_DURATION_S, duration)
+        if duration > self._RESET_WARN_DURATION_S:
+            delta = float(np.max(np.abs(target - start)))
+            debug_print(self.name, f"复位轨迹较长：{duration:.2f}s，最大关节差 {delta:.3f} rad", "WARNING")
+        self.execute_joint_smootherstep(start, target, duration=duration, hz=self._RESET_HZ)
 
     @abstractmethod
     def apply_reset(self, start_state):

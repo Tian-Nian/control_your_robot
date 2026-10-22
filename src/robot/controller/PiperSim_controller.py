@@ -10,12 +10,16 @@ from pathlib import Path
 
 import numpy as np
 
-from robot.controller.arm_controller import ArmController
+from robot.controller.arm_controller import ArmController, reject_unsupported_mode
+from robot.controller.arm_servo import ArmServoLaw
+from robot.controller.payload_gravity import payload_torque
 from robot.utils.base.data_handler import debug_print
 
 ARM_JOINTS = ("joint1", "joint2", "joint3", "joint4", "joint5", "joint6")
 GRIPPER_JOINTS = ("joint7", "joint8")
 READY_JOINT = np.array([0.0, 1.3, -1.0, 0.0, 0.5, 0.0])
+_DEFAULT_JOINT_K = np.array([16.0, 16.0, 16.0, 8.0, 8.0, 8.0])
+_DEFAULT_JOINT_D = np.array([1.8, 1.8, 1.8, 1.8, 1.8, 1.8])
 
 
 class SimProtection(RuntimeError):
@@ -32,6 +36,8 @@ def default_urdf() -> Path:
 
 
 class PiperSimController(ArmController):
+    supported_modes = ("position", "mit", "gravity_compensation", "impedance")
+
     def __init__(self, name, urdf_path=None, spawn=False, record_path=None, INFO="DEBUG"):
         super().__init__()
         self.name = name
@@ -39,6 +45,17 @@ class PiperSimController(ArmController):
         self.controller = None
         self.INFO = INFO
         self.DoFs = 6
+        self._q_des = None
+        self._qd_des = np.zeros(6)
+        self._kp = np.zeros(6)
+        self._kd = np.zeros(6)
+        self._tau_ff = None
+        self._joint_K = _DEFAULT_JOINT_K.copy()
+        self._joint_D = _DEFAULT_JOINT_D.copy()
+        self._plant_mass = 0.0
+        self._plant_com = np.zeros(3)
+        self._identified_mass = 0.0
+        self._identified_com = np.zeros(3)
         self.urdf_path = str(Path(urdf_path) if urdf_path else default_urdf())
         self.spawn = bool(spawn)
         self.record_path = None if record_path in (None, "") else str(record_path)
@@ -57,7 +74,7 @@ class PiperSimController(ArmController):
         self._tick = 0
         self._last_result = {}
 
-    def set_up(self, input=None):
+    def set_up(self, control_mode="position", joint_K=None, joint_D=None, plant_mass=0.0, plant_com=None, input=None):
         import pinocchio as pin
 
         self.model = pin.buildModelFromUrdf(self.urdf_path)
@@ -69,6 +86,24 @@ class PiperSimController(ArmController):
         self.qd = np.zeros(self.model.nv)
         self.fault = ""
         self.sim_time = 0.0
+        self._q_des = self.q[:6].copy()
+        self._qd_des = np.zeros(6)
+        self._kp = np.zeros(6)
+        self._kd = np.zeros(6)
+        self._tau_ff = None
+        self._joint_K = _six(joint_K, _DEFAULT_JOINT_K)
+        self._joint_D = _six(joint_D, _DEFAULT_JOINT_D)
+        self._plant_mass = float(plant_mass)
+        self._plant_com = np.zeros(3) if plant_com is None else np.asarray(plant_com, dtype=float).reshape(3)
+        self._identified_mass = 0.0
+        self._identified_com = np.zeros(3)
+        self._servo_law = ArmServoLaw(
+            self.urdf_path,
+            joint_K=self._joint_K,
+            joint_D=self._joint_D,
+            apply_scale=False,
+        )
+        self.set_control_mode(control_mode)
         self._flange_id = self.model.getFrameId("flange")
         self._refresh()
         flange = self.data.oMf[self._flange_id]
@@ -88,7 +123,19 @@ class PiperSimController(ArmController):
             "eef": self._pose_vector(self._flange_id),
             "gripper": np.array([opening]),
             "velocity": self.qd[:6].copy(),
+            "control_mode": self.control_mode,
+            "servo_fault": self.fault,
         }
+
+    def set_control_mode(self, mode: str) -> str:
+        target = reject_unsupported_mode(self.name, mode, self.supported_modes)
+        entering = target != self.control_mode
+        self.control_mode = target
+        if self.q is not None and entering and target != "position":
+            self.qd[:] = 0.0
+            self.fault = ""
+            self._q_des = self.q[:6].copy()
+        return target
 
     def set_joint(self, joint):
         self._require_model()
@@ -96,10 +143,56 @@ class PiperSimController(ArmController):
         if target.size != self.DoFs:
             debug_print(self.name, f"set_joint() input size should be {self.DoFs}", "ERROR")
             return
-        self.q[:6] = np.clip(target, self._lower[:6], self._upper[:6])
-        self.qd[:] = 0.0
+        clipped = np.clip(target, self._lower[:6], self._upper[:6])
+        self._q_des = clipped.copy()
         self.fault = ""
+        if self.control_mode in ("impedance", "mit"):
+            return
+        self.q[:6] = clipped
+        self.qd[:] = 0.0
         self._publish()
+
+    def set_mit(self, q_des, kp, kd, qd_des=None, tau_ff=None):
+        """记下 MIT 五项。伺服在 `servo_step` 里积分。不传 tau_ff 时每拍用 g(q)。"""
+        self._require_model()
+        self.set_control_mode("mit")
+        self._q_des = np.asarray(q_des, dtype=float).reshape(6)
+        self._kp = np.asarray(kp, dtype=float).reshape(6)
+        self._kd = np.asarray(kd, dtype=float).reshape(6)
+        self._qd_des = np.zeros(6) if qd_des is None else np.asarray(qd_des, dtype=float).reshape(6)
+        self._tau_ff = None if tau_ff is None else np.asarray(tau_ff, dtype=float).reshape(6)
+        return self.mit_torque(self._q_des, self._kp, self._kd, self._qd_des, self._tau_ff)
+
+    def servo_step(self, dt: float) -> None:
+        """周期力矩。position 不积分。速度保护只记在 fault 里。"""
+        if self.model is None or self.control_mode == "position" or self.fault:
+            return
+        # 腕关节惯量很小，50 Hz 上把阻尼力矩冻住 20 ms 会数值发散。控制律按 0.05 ms 刷新。
+        # 重力项变化慢，1 ms 就够。
+        remaining = float(dt)
+        refresh = 0.001 if self.control_mode == "gravity_compensation" else 0.00005
+        try:
+            while remaining > 1e-12 and not self.fault:
+                step = min(refresh, remaining)
+                torque = self._servo_torque()
+                if torque is None:
+                    return
+                self.step_torque(torque, step, publish=False)
+                remaining -= step
+            self._publish()
+        except SimProtection:
+            return
+
+    def _servo_torque(self):
+        if self._q_des is None:
+            self._q_des = self.q[:6].copy()
+        if self.control_mode == "gravity_compensation":
+            return self.gravity_compensation()
+        if self.control_mode == "impedance":
+            return self.joint_impedance_torque(self._q_des, self._joint_K, self._joint_D)["torque"]
+        if self.control_mode == "mit":
+            return self.mit_torque(self._q_des, self._kp, self._kd, self._qd_des, self._tau_ff)["torque"]
+        return None
 
     def set_position(self, position):
         self._require_model()
@@ -156,12 +249,11 @@ class PiperSimController(ArmController):
             )
         return rows
 
-    def gravity_compensation(self):
-        """抵消重力所需的电机力矩，单位 N·m。
+    def link_gravity(self):
+        """URDF 里各连杆的质量和质心产生的 g(q)，单位 N·m。不含后来辨识的法兰负载。"""
+        return self._link_gravity_full()[:6]
 
-        静止、速度和加速度都为 0 时，逆动力学 τ = g(q)。g(q) 用 URDF 的质量、质心和惯量。
-        返回手臂 6 个关节，不含夹爪。
-        """
+    def _link_gravity_full(self):
         import pinocchio as pin
 
         self._require_model()
@@ -173,7 +265,42 @@ class PiperSimController(ArmController):
             np.zeros(self.model.nv),
             np.zeros(self.model.nv),
         )
-        return np.array(torque[:6], dtype=float)
+        return np.array(torque, dtype=float)
+
+    def gravity_compensation(self):
+        """抵消重力所需的电机力矩，单位 N·m。
+
+        连杆部分是 URDF 的 g(q)。法兰上已辨识的质量和质心再加 J^T [mg; (Rc)×(mg)]。
+        返回手臂 6 个关节，不含夹爪。
+        """
+        if getattr(self, "_servo_law", None) is not None:
+            return self._servo_law.compensation(self.q)
+        return self.link_gravity() + self._payload_torque(self._identified_mass, self._identified_com)
+
+    def holding_torque(self):
+        """这个姿态上托住臂不动时，关节力矩计该读到的数。
+
+        连杆仍用 URDF。植物负载是仿真里真实挂在法兰上、但还没写进补偿模型的那一块。
+        真机上对应的读数是停稳后的关节力矩，不是补偿命令本身。
+        """
+        return self.link_gravity() + self._payload_torque(self._plant_mass, self._plant_com)
+
+    def set_identified_payload(self, mass, com) -> None:
+        self._identified_mass = float(mass)
+        self._identified_com = np.asarray(com, dtype=float).reshape(3)
+        if getattr(self, "_servo_law", None) is not None:
+            self._servo_law.set_payload(mass, com)
+
+    def set_plant_payload(self, mass, com) -> None:
+        """仿真里真实的法兰负载。补偿模型要等辨识之后才知道它。"""
+        self._plant_mass = float(mass)
+        self._plant_com = np.asarray(com, dtype=float).reshape(3)
+
+    def _payload_torque(self, mass, com) -> np.ndarray:
+        if abs(float(mass)) < 1e-12:
+            return np.zeros(6)
+        pose = self.flange_pose()
+        return payload_torque(self.flange_jacobian(), pose[:3, :3], mass, com)
 
     def joint_impedance_torque(self, q_des, stiffness, damping, qd_des=None):
         """τ = K (q_d - q) + D (qd_d - qd) + g(q)。g(q) 来自 URDF。"""
@@ -262,7 +389,7 @@ class PiperSimController(ArmController):
         self._ik(rotation, point - rotation @ self.tool_offset)
         return self.tool_point()
 
-    def step_torque(self, torque, dt, torque_limit=None, speed_limit=3.0):
+    def step_torque(self, torque, dt, torque_limit=None, speed_limit=3.0, publish=True):
         """用 Pinocchio 正动力学走一步。torque 是 6 个手臂关节的电机力矩。
 
         speed_limit 用 URDF 里的关节速度上限（rad/s）。超过以后速度清零并停止，避免仿真数值发散。
@@ -278,15 +405,21 @@ class PiperSimController(ArmController):
             raise ValueError(f"torque 需要 {self.DoFs} 个数")
         full = np.zeros(self.model.nv)
         full[:6] = commanded
+        # 夹爪不在 6 维指令里。不补上它自己的重力时，腕会被质量矩阵耦合甩出去。
+        full[6:] = self._link_gravity_full()[6:]
         if torque_limit is not None:
             limit = float(torque_limit)
             full[:6] = np.clip(full[:6], -limit, limit)
-        # 力矩在这一拍里保持不变。积分用 1 ms，避免腕关节惯量很小时显式欧拉发散。
-        # 这不等价于驱动器内部的电流环，只是让 200 Hz 的命令还能数值上站住。
+        # 这一小段里力矩保持不变，内部再用 1 ms 积分。带阻尼的伺服不要一次丢进 20 ms，
+        # servo_step 会把控制律拆到 0.05 ms。这不是驱动器电流环。
         remaining = float(dt)
         while remaining > 1e-12:
             step = min(0.001, remaining)
-            acceleration = np.array(pin.aba(self.model, self.data, self.q, self.qd, full), dtype=float)
+            applied = full
+            if abs(self._plant_mass) >= 1e-12:
+                applied = full.copy()
+                applied[:6] = full[:6] - self._payload_torque(self._plant_mass, self._plant_com)
+            acceleration = np.array(pin.aba(self.model, self.data, self.q, self.qd, applied), dtype=float)
             self.qd = self.qd + acceleration * step
             peak = float(np.max(np.abs(self.qd[:6])))
             if speed_limit is not None and peak > float(speed_limit):
@@ -299,7 +432,8 @@ class PiperSimController(ArmController):
             self._clip_joints()
             remaining -= step
         self.sim_time += float(dt)
-        self._publish()
+        if publish:
+            self._publish()
         return self.q[:6].copy()
 
     def _ik(self, rotation, translation, iterations=40):
@@ -428,7 +562,37 @@ class PiperSimController(ArmController):
                     for row in self.link_inertias()
                 ],
                 "torque": _tolist(gravity),
+                "link_gravity": _tolist(self.link_gravity()),
                 "missing": _tolist(-gravity),
+                "identified_mass": self._identified_mass,
+                "identified_com": _tolist(self._identified_com),
+            }
+            return
+        if op == "hold_torque":
+            pose = self.flange_pose()
+            self._last_result = {
+                "kind": "hold_torque",
+                "joint": _tolist(self.q[:6]),
+                "torque": _tolist(self.holding_torque()),
+                "link_gravity": _tolist(self.link_gravity()),
+                "jacobian": self.flange_jacobian().reshape(-1).tolist(),
+                "rotation": pose[:3, :3].reshape(-1).tolist(),
+            }
+            return
+        if op == "set_payload":
+            self.set_identified_payload(data["mass"], data["com"])
+            self._last_result = {
+                "kind": "set_payload",
+                "mass": self._identified_mass,
+                "com": _tolist(self._identified_com),
+            }
+            return
+        if op == "set_plant_payload":
+            self.set_plant_payload(data["mass"], data["com"])
+            self._last_result = {
+                "kind": "set_plant_payload",
+                "mass": self._plant_mass,
+                "com": _tolist(self._plant_com),
             }
             return
         if op == "impedance":
@@ -438,6 +602,10 @@ class PiperSimController(ArmController):
             damping = np.asarray(data.get("damping", [1.8] * 6), dtype=float).reshape(6)
             parts = self.joint_impedance_torque(q_des, stiffness, damping)
             self._last_result = {"kind": "impedance", **{key: _tolist(value) for key, value in parts.items()}}
+            if self.control_mode == "impedance":
+                self._q_des = q_des
+                self._joint_K = stiffness
+                self._joint_D = damping
             return
         if op == "cartesian":
             position = np.asarray(data["position_des"], dtype=float).reshape(3)
@@ -449,8 +617,16 @@ class PiperSimController(ArmController):
             q_des = np.asarray(data.get("q_des", np.zeros(6)), dtype=float).reshape(6)
             kp = np.asarray(data.get("kp", np.zeros(6)), dtype=float).reshape(6)
             kd = np.asarray(data.get("kd", np.zeros(6)), dtype=float).reshape(6)
-            parts = self.mit_torque(q_des, kp, kd)
+            qd_des = data.get("qd_des")
+            tau_ff = data.get("tau_ff")
+            parts = self.mit_torque(q_des, kp, kd, qd_des, tau_ff)
             self._last_result = {"kind": "mit", **{key: _tolist(value) for key, value in parts.items()}}
+            if self.control_mode == "mit":
+                self._q_des = q_des
+                self._kp = kp
+                self._kd = kd
+                self._qd_des = np.zeros(6) if qd_des is None else np.asarray(qd_des, dtype=float).reshape(6)
+                self._tau_ff = None if tau_ff is None else np.asarray(tau_ff, dtype=float).reshape(6)
             return
         if op == "tool_delta":
             before = self.flange_pose()
@@ -543,6 +719,15 @@ def _rotation_from_wxyz(quaternion) -> np.ndarray:
         float(quaternion[2]),
         float(quaternion[3]),
     ).matrix()
+
+
+def _six(value, default) -> np.ndarray:
+    if value is None:
+        return np.array(default, dtype=float).reshape(6)
+    gain = np.asarray(value, dtype=float).reshape(-1)
+    if gain.size != 6:
+        raise ValueError(f"需要 6 个数，得到 {gain.size}")
+    return gain
 
 
 def _rotation_from_rpy(rpy) -> np.ndarray:

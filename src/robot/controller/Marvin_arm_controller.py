@@ -133,6 +133,8 @@ def joint_torque_from_feedback(data: dict, arm_id: str) -> np.ndarray | None:
 
 
 class MarvinArmController(ArmController):
+    supported_modes = ("position", "impedance", "cartesian", "force")
+
     def __init__(self, name: str = "marvin_arm"):
         super().__init__()
         self.name = name
@@ -147,6 +149,7 @@ class MarvinArmController(ArmController):
         self._held = False
         self._enabled = False
         self._mode = "impedance"
+        self.control_mode = "impedance"
         self._joint_K = list(_DEFAULT_K)
         self._joint_D = list(_DEFAULT_D)
         self._cart_K = list(_DEFAULT_CART_K)
@@ -183,6 +186,9 @@ class MarvinArmController(ArmController):
         self.side, self.arm_id = _resolve_arm(side, arm_id)
         self._robot_ip = robot_ip
         self._mode = normalize_control_mode(control_mode)
+        if self._mode not in self.supported_modes:
+            raise ValueError(f"{self.name} 不支持 {control_mode!r}，只有 {list(self.supported_modes)}")
+        self.control_mode = self._mode
         self._joint_K = [float(v) for v in (joint_K if joint_K is not None else _DEFAULT_K)]
         self._joint_D = [float(v) for v in (joint_D if joint_D is not None else _DEFAULT_D)]
         self._cart_K = [float(v) for v in (cart_K if cart_K is not None else _DEFAULT_CART_K)]
@@ -261,7 +267,10 @@ class MarvinArmController(ArmController):
 
     def set_control_mode(self, mode: str) -> str:
         target = normalize_control_mode(mode)
+        if target not in self.supported_modes:
+            raise ValueError(f"{self.name} 不支持 {mode!r}，只有 {list(self.supported_modes)}")
         if self._enabled and target == self._mode:
+            self.control_mode = target
             return target
         if target == "position":
             self._switch_position()
@@ -275,12 +284,9 @@ class MarvinArmController(ArmController):
             else:
                 self._switch_force()
         self._mode = target
+        self.control_mode = target
         self._enabled = True
         return target
-
-    def apply_reset(self, start_state):
-        target = self._home if start_state is None else np.asarray(start_state, dtype=float)
-        self.set_joint(target)
 
     def stop(self) -> None:
         robot = self._robot

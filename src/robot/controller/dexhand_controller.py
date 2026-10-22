@@ -42,8 +42,26 @@ class DexHandController(Controller):
         pass
 
     def apply_reset(self, start_state):
-        target = np.zeros(6) if start_state is None else np.asarray(start_state, dtype=float)
-        self.set_joint(target)
+        current = self._reset_joint()
+        if current is None:
+            target = np.zeros(6) if start_state is None else np.asarray(start_state, dtype=float)
+            self.set_joint(target)
+            return
+        self.interpolate_set_joint(current, start_state)
+
+    def _reset_joint(self):
+        state_fn = getattr(self, "get_state", None)
+        if callable(state_fn):
+            state = state_fn()
+            if isinstance(state, dict) and state.get("joint") is not None:
+                return state["joint"]
+        joint_fn = getattr(self, "get_joint", None)
+        if callable(joint_fn):
+            try:
+                return joint_fn()
+            except Exception:
+                return None
+        return None
 
     def __repr__(self):
         if self.controller is not None:

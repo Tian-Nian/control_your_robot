@@ -161,8 +161,7 @@ class WujiHandController(Controller):
         self._last_enable_t = now
 
     def apply_reset(self, start_state):
-        target = np.zeros(_N_JOINTS) if start_state is None else np.asarray(start_state, dtype=float)
-        self.set_joint(target)
+        self.interpolate_set_joint(self.get_joint(), start_state)
 
     def stop(self) -> None:
         self._stop.set()

@@ -36,6 +36,16 @@ Hardware is optional. `config/runtime/test_robot.yml` uses in-process test devic
 - Debug level for the older prints: `INFO_LEVEL` = `DEBUG` | `INFO` | `ERROR`.
 - Do not commit `Log/`, `save/`, `data/`, or device logs.
 
+## Devices and servo modes
+
+Onboarding a device follows `.cursor/skills/add-device/SKILL.md`.
+
+Standard arm mode names are `position`, `mit`, `gravity_compensation`, and `impedance`. `setup.control_mode` is passed into `set_up`. Each arm declares `supported_modes`. A name outside that list raises, and the error lists the modes that device implements. Publish `control_mode` when a toolkit needs to read the active mode.
+
+`servo_step(dt)` runs in the component loop, before `get()`, when the class defines it. `dt` is `1/rate_hz` for that component. An arm whose SDK servos internally switches mode once and does not integrate a second copy on the host.
+
+Toolkits live under `toolkits/<name>/agent.md`. Read that file and run its check before teaching the steps.
+
 ## Runtime
 
 - One latest-value shared-memory segment per service. Values are `msgpack_numpy`.
@@ -63,8 +73,8 @@ cyr start --config config/runtime/test_robot.yml
 cyr status
 cyr snapshot
 cyr echo left_arm
-cyr call left_arm '{"joint":[0,0,0,0,0,0]}'
 cyr call left_arm '{"op":"reset"}' --timeout 15
+cyr call left_arm '{"joint":[0, 1.3, -1, 0, 0.5, 0]}'
 cyr call left_arm '{"op":"release"}'
 cyr hmi
 cyr stop
@@ -83,8 +93,8 @@ session = Session.attach()          # name or shm_name when more than one is liv
 session.describe()
 session.snapshot()                  # arrays longer than 8, and images, are summarized
 session.read_raw("left_arm")        # full arrays, including pixels
-session.call("left_arm", {"joint": [0, 0, 0, 0, 0, 0]}, timeout=15)
-session.reset("left_arm", timeout=15)
+session.reset("left_arm")
+session.call("left_arm", {"joint": [0, 1.3, -1, 0, 0.5, 0]}, timeout=15)
 session.close()
 ```
 

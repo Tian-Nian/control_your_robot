@@ -14,7 +14,7 @@ cyr stop
 
 `cyr` must be the console script from this install. On Debian, `/usr/bin/cyr` is a different program. Check with `which cyr`.
 
-Hardware is optional. `config/runtime/test_robot.yml` uses in-process test devices. `config/runtime/marvin_lab.yml` is the Marvin lab bench.
+Hardware is optional. `config/runtime/test_robot.yml` uses in-process test devices. `config/runtime/piper_sim.yml` is the Piper simulator in position mode. Gravity and impedance use `piper_sim_gravity.yml` and `piper_sim_impedance.yml`. `config/runtime/marvin_lab.yml` is the Marvin lab bench.
 
 ## Commands
 
@@ -31,11 +31,11 @@ Hardware is optional. `config/runtime/test_robot.yml` uses in-process test devic
 | `cyr call NAME JSON` | Send one command. Exit 0 only when `accepted` is true |
 
 ```bash
-cyr call left_arm '{"joint":[0,0,0,0,0,0]}'
 cyr call left_arm '{"op":"reset"}'
-cyr call left_arm '{"joint":[0,0,0,0,0,0]}' --delta
+cyr call left_arm '{"joint":[0, 1.3, -1, 0, 0.5, 0]}'
+cyr call left_arm '{"joint":[0, 0.05, 0, 0, 0, 0]}' --delta
 cyr call left_arm '{"op":"release"}'
-cyr call left_arm '{"joint":[0,0,0,0,0,0]}' --timeout 15
+cyr call left_arm '{"control_mode":"gravity_compensation"}'
 ```
 
 `cyr hmi`: `q` leaves the UI. `x`, then `y` or Enter, stops every running service. `n` cancels that prompt. Up / down or `k` / `j` move the selection.
@@ -65,14 +65,14 @@ session = Session.attach()                 # or Session.attach("marvin_lab")
 session.describe()
 session.snapshot()                         # images and arrays longer than 8 are summarized
 session.read_raw("cam_head")               # pixels kept
-session.call("left_arm", {"joint": [0, 0, 0, 0, 0, 0]}, timeout=15)
-session.reset("left_arm", timeout=15)
+session.reset("left_arm")
+session.call("left_arm", {"joint": [0, 1.3, -1, 0, 0.5, 0]}, timeout=15)
 session.close()
 ```
 
 `attach(name)` matches the service `name` or `shm_name`. With one service, the name can be omitted. With several, it is required.
 
-`call` first waits up to `timeout` (default 2 seconds) for the node to take the command. If that command starts joint tracking, the wait extends to the component `motion.timeout_s` plus half a second. Use a timeout long enough for the node to pop the command. Marvin arms in the lab config use 12 seconds of tracking, so pass `--timeout 15` or `timeout=15` for a long move.
+`call` first waits up to `timeout` (default 2 seconds) for the node to take the command. If that command starts joint tracking, the wait extends to the component `motion.timeout_s` plus half a second. `Session.reset` waits 15 seconds by default. `cyr call` does the same for `{"op":"reset"}` when `--timeout` is left at its default. Reset returns after the controller has sent the whole trajectory. Marvin arms in the lab config use 12 seconds of tracking, so pass `--timeout 15` or `timeout=15` for a long move.
 
 ## Policy harness
 
@@ -137,11 +137,48 @@ Clearance uses the commanded arm and holds every other arm at its `home` pose. I
 
 `motion`, when `enabled: true`, walks the joint goal in steps of `max_step_rad` (default 0.05) and waits until feedback is inside `tol_rad` (default 0.02) or `timeout_s` expires. The whole joint-space segment is checked against limits and clearance before the first step. A timeout holds the component; it does not latch service safety.
 
-`{"op":"release"}` clears that hold. `{"op":"reset"}` moves to `start_state`, or to the body `home` when `start_state` is omitted. With tracking enabled, reset uses the same limited path.
+`{"op":"release"}` clears that hold. `{"op":"reset"}` calls the controller `reset`. Do not home with `{"joint":[0,0,...]}`: in position mode that command sets the goal to zero in one step.
+
+Reset runs a smootherstep from the current joints, peak speed 1.7 rad/s, at least 0.8 s, and calls `set_joint` on each sample. If the arm is already there, it sends the current joints once. An arm sitting in impedance or gravity compensation is switched to `position` first, because some `set_joint` implementations do not move the joints in those modes. Optional `start_state` is the joint goal. When it is omitted, a body file supplies `home`; otherwise the controller uses its own `_home` or `_init_pose`, and only then zeros. A configured gate checks limits and clearance along that path before the first sample.
+
+```bash
+cyr call left_arm '{"op":"reset"}'
+cyr call left_arm '{"op":"reset","start_state":[0, 1.3, -1, 0, 0.5, 0]}'
+```
 
 An `eef` command with no `joint`, on a component that has a body, is solved for position only. The quaternion is not tracked. `--delta` on `eef` is added to the current flange pose before IK. `--delta` on `joint` is added to the current joints, then gated as an absolute target.
 
-`control_mode` accepts `impedance` (`imp`, `imp_joint`, `teleop`, `teleop_imp`) and `position` (`pos`). The mode changes only after the joint gate accepts the command.
+## Servo modes
+
+`setup.control_mode` is passed to `set_up`. Change it later with `cyr call NAME '{"control_mode":"..."}'`. Each arm implements only its own `supported_modes`. An unknown name raises and lists the modes that device has. Aliases: `pos`, `mit_control`, `gravity`, `imp`, `imp_joint`, `teleop`, `teleop_imp`, `cart`, `imp_cart`, `imp_force`.
+
+| Mode | Who | What the host sends |
+|------|-----|---------------------|
+| `position` | every arm | A joint goal to the drive or the simulator. PiperSim in this mode moves straight to the goal |
+| `mit` | Piper, PiperAgx, Y1, PiperSim | `kp`, `kd`, `q_des`, `qd_des`, `tau_ff` |
+| `gravity_compensation` | arms that can send joint MIT and have a URDF | `kp = 0`, the arm's small `kd`, and `tau_ff` equal to link gravity plus the identified flange load. A real arm then multiplies `torque_scale`. The host does not integrate |
+| `impedance` | the same arms, plus Marvin | On an MIT arm, `kp` and `kd` are `joint_K` and `joint_D` from the config, and `tau_ff` is still that gravity torque. Real arms do not reuse the simulator's default gains |
+| `cartesian`, `force` | Marvin | The drive's own Cartesian impedance and end-effector force. These names stay as they are |
+
+An arm that can send joint MIT inherits `MitServo`. Piper and Y1 refresh the command on the control tick. PiperAgx keeps its 200 Hz thread and no longer computes a second URDF gravity. Without a URDF, gravity and impedance are rejected. Piper reads the URDF from `setup.urdf`. Marvin has no joint MIT. Its impedance is `set_imp_joint_state`, and the load is the 10-number tool dynamics passed to `set_tool`.
+
+## Toolkits
+
+Each toolkit's steps are in `toolkits/<name>/agent.md`. Run that directory's `check.py` first. When it fails, follow the questions it prints.
+
+Gravity identification fits flange mass `m` and center of mass `c`. Inertia is not observable from a static hold. Leave the arm in `position`, send at least eight joint targets with different wrist orientations through `cyr call`, and let `collect.py` record torque after the arm stops. The residual is measured torque minus link `g(q)`. The fit is written back with `{"op":"set_payload"}`, then the mode switches to `gravity_compensation`. Collect again after changing the gripper. If the load is already in the URDF, pass `--tool-in-urdf` and skip collection.
+
+Joint impedance does not fit `K` and `D`. On a real arm those values belong in `setup`. The simulator defaults exist only in `piper_sim_impedance.yml`.
+
+```bash
+cyr start --config config/runtime/piper_sim_gravity.yml
+python toolkits/gravity_compensation/check.py --tool-in-urdf
+python toolkits/gravity_compensation/collect.py --service piper_sim --arm left_arm
+cyr start --config config/runtime/piper_sim_impedance.yml
+python toolkits/impedance/check.py
+```
+
+Hand-eye lives in `toolkits/handeye/`. PiperSim has no camera, so the check asks for a camera name and whether the camera is eye-in-hand or eye-to-hand. `toolkits/handeye_charuco_roma/` is the previous capture front end and stays as it is.
 
 ## Body file
 
@@ -163,7 +200,7 @@ The pose vector is xyz meters plus quaternion wxyz. `flange_to_palm` is the palm
 ```bash
 cyr start --config config/runtime/marvin_lab.yml
 cyr call left_arm '{"control_mode":"position"}'
-cyr call left_hand '{"joint":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}'
+cyr call left_hand '{"op":"reset"}'
 cyr call left_arm '{"op":"reset"}' --timeout 15
 ```
 
@@ -197,8 +234,9 @@ The Marvin URDF and `pinocchio` tests skip when those are absent.
 | `src/robot/harness/` | Body model, command gate, joint tracking, action contract, aligned observation, episode log |
 | `src/robot/controller/` | Arm, mobile, dexterous-hand, and test controllers |
 | `src/robot/sensor/` | Cameras, tactile sensors, and test sensors |
-| `config/runtime/` | `test_robot.yml`, `marvin_lab.yml` |
+| `config/runtime/` | `test_robot.yml`, `piper_sim.yml`, `piper_sim_gravity.yml`, `piper_sim_impedance.yml`, `marvin_lab.yml` |
 | `config/bodies/` | Body description used by the gate and harness |
+| `toolkits/` | Gravity compensation, joint impedance, Charuco hand-eye |
 | `third_party/` | Vendor libraries |
 | `agent.md` | Notes for coding agents |
 | `developer_README.md` | Where the old collect / deploy notes went |

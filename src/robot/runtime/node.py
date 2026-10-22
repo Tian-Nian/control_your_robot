@@ -31,8 +31,19 @@ _CONTROL_MODES = frozenset(
         "cart",
         "force",
         "imp_force",
+        "mit",
+        "mit_control",
+        "gravity_compensation",
+        "gravity",
     }
 )
+
+
+def _servo(component, dt: float) -> None:
+    step = getattr(component, "servo_step", None)
+    if step is None:
+        return
+    step(float(dt))
 
 
 def load_component(spec: dict):
@@ -84,6 +95,7 @@ def run_component(shm_name: str, spec: dict, stop_event, factory=None) -> None:
                 break
             move_error = str(getattr(component, "_cyr_last_cmd_error", "") or "")
             try:
+                _servo(component, period)
                 data = component.get()
                 timestamp_ns = time.time_ns()
                 if isinstance(data, dict) and data.get("timestamp") is not None:
@@ -211,6 +223,7 @@ def run_bundle(shm_name: str, specs: list[dict], stop_event) -> None:
                     break
                 error = str(getattr(component, "_cyr_last_cmd_error", "") or "")
                 try:
+                    _servo(component, 1.0 / float(spec["rate_hz"]))
                     data = component.get()
                     timestamp_ns = time.time_ns()
                     if isinstance(data, dict) and data.get("timestamp") is not None:
@@ -359,7 +372,18 @@ def _apply_command(spec: dict, component, command: dict) -> None:
     if data.get("op") == "reset":
         _apply_reset(spec, component, data.get("start_state"), int(command["seq"]))
         return
-    if data.get("op") in ("gravity", "impedance", "cartesian", "mit", "pose", "tool_delta", "touch"):
+    if data.get("op") in (
+        "gravity",
+        "hold_torque",
+        "set_payload",
+        "set_plant_payload",
+        "impedance",
+        "cartesian",
+        "mit",
+        "pose",
+        "tool_delta",
+        "touch",
+    ):
         handler = getattr(component, "handle_runtime_op", None)
         if handler is None:
             raise CommandRejected(f"组件不接受 {data.get('op')}")
@@ -413,27 +437,30 @@ def _apply_command(spec: dict, component, command: dict) -> None:
 
 
 def _apply_reset(spec: dict, component, start_state, seq: int) -> None:
-    if not _motion_enabled(spec) and not _gate_configured(spec, component):
-        reset = getattr(component, "reset", None)
-        if reset is not None:
-            reset(start_state)
-        return
-    if start_state is not None:
-        goal = np.asarray(start_state, dtype=float).reshape(-1)
-    else:
-        body = getattr(component, "_cyr_body", None)
-        arm = _arm_name(spec)
-        if body is None or arm not in body.arm_names():
-            raise CommandRejected("没有 home，不能复位")
-        goal = body.home(arm)
-    if _motion_enabled(spec):
-        _begin_joint(spec, component, goal, seq, eef=None)
-        return
-    current = _current_joint(component)
-    checked = _gate(spec, component, current, goal, eef=None, trajectory=False)
+    """调用控制器自己的 reset。整段轨迹由 set_joint 插值发出，不把零位一次下发。"""
+    del seq
+    goal = _reset_goal(spec, component, start_state)
+    if goal is not None and (_motion_enabled(spec) or _gate_configured(spec, component)):
+        goal = _gate(spec, component, _current_joint(component), goal, eef=None, trajectory=True)
     reset = getattr(component, "reset", None)
-    if reset is not None:
-        reset(checked.tolist())
+    if reset is None:
+        raise CommandRejected("组件没有 reset")
+    try:
+        reset(None if goal is None else np.asarray(goal, dtype=float).reshape(-1).tolist())
+    except CommandRejected:
+        raise
+    except Exception as exc:
+        raise CommandRejected(str(exc)) from exc
+
+
+def _reset_goal(spec: dict, component, start_state):
+    if start_state is not None:
+        return np.asarray(start_state, dtype=float).reshape(-1)
+    body = getattr(component, "_cyr_body", None)
+    arm = _arm_name(spec)
+    if body is not None and arm in body.arm_names():
+        return np.asarray(body.home(arm), dtype=float).reshape(-1)
+    return None
 
 
 def _begin_joint(spec: dict, component, goal, seq: int, eef) -> None:
@@ -464,7 +491,7 @@ def _start_joint(spec: dict, component, goal, seq: int) -> None:
 def _apply_mode(component, mode) -> None:
     if str(mode).strip().lower() not in _CONTROL_MODES:
         raise CommandRejected(
-            f"control_mode 只能是 position、impedance、cartesian 或 force，得到 {mode!r}"
+            f"control_mode 只能是 position、mit、gravity_compensation、impedance、cartesian 或 force，得到 {mode!r}"
         )
     move = getattr(component, "move", None)
     if move is not None:

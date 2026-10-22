@@ -1,7 +1,11 @@
 
 
-from robot.controller.arm_controller import ArmController
+import os
+
+from robot.controller.arm_controller import ArmController, reject_unsupported_mode
+from robot.controller.arm_servo import MitServo, law_from_piper_profile
 from robot.controller.mit_command import pack_joint_mit
+from robot.controller.piper_gravity_config import PiperTeleopGravityConfig
 
 from piper_sdk import *
 import numpy as np
@@ -26,7 +30,9 @@ def effort_from_high_speed(message) -> np.ndarray:
     return np.asarray(values, dtype=float)
 
 
-class PiperController(ArmController):
+class PiperController(MitServo, ArmController):
+    supported_modes = ("position", "mit", "gravity_compensation", "impedance")
+
     def __init__(self, name):
         super().__init__()
         self.name = name
@@ -34,21 +40,41 @@ class PiperController(ArmController):
         self.controller = None
         self.DoFs = _DOF
         self._last_result = {}
-    
-    def set_up(self, can:str):
+        self._drive_mit = False
+
+    def set_up(self, can: str, control_mode: str = "position", urdf=None, joint_K=None, joint_D=None):
         piper = C_PiperInterface_V2(can)
         piper.ConnectPort()
         piper.EnableArm(7)
         enable_fun(piper=piper)
         self.controller = piper
+        if urdf:
+            arm_type = "piper_x" if "piper_x" in str(urdf).lower() else "piper"
+            config = PiperTeleopGravityConfig.for_arm_urdf(arm_type, urdf, env=os.environ)
+            self.bind_mit_servo(law_from_piper_profile(urdf, config, joint_K=joint_K, joint_D=joint_D))
+        self.set_control_mode(control_mode)
 
-    def apply_reset(self, start_state):
-        if start_state is None:
-            start_state = np.zeros(6)
-        try:
-            self.set_joint(np.asarray(start_state, dtype=float))
-        except Exception:
-            print("reset error")
+    def set_control_mode(self, mode: str) -> str:
+        """位置和显式 MIT 切一次 SDK。重力和阻抗也进 MIT，但每个周期只刷新前馈，不改对外模式。"""
+        target = reject_unsupported_mode(self.name, mode, self.supported_modes)
+        if target in ("gravity_compensation", "impedance"):
+            law = self.require_mit_servo()
+            if target == "impedance":
+                law.require_gains()
+            self.control_mode = target
+            if self.controller is not None:
+                self.controller.MotionCtrl_2(0x01, 0x04, 100, 0xAD)
+                self._drive_mit = True
+            return target
+        self.control_mode = target
+        self._drive_mit = target == "mit"
+        if self.controller is None:
+            return target
+        if target == "mit":
+            self.controller.MotionCtrl_2(0x01, 0x04, 100, 0xAD)
+        else:
+            self.controller.MotionCtrl_2(0x01, 0x01, 100, 0x00)
+        return target
 
     # 返回单位为米
     def get_state(self):
@@ -61,6 +87,7 @@ class PiperController(ArmController):
         state["eef"] = np.array([eef.end_pose.X_axis, eef.end_pose.Y_axis, eef.end_pose.Z_axis, \
                                   eef.end_pose.RX_axis, eef.end_pose.RY_axis, eef.end_pose.RZ_axis]) * 0.001 / 1000
         state["gripper"] = self.controller.GetArmGripperMsgs().gripper_state.grippers_angle * 0.001 / 70
+        state["control_mode"] = self.control_mode
         try:
             state["force"] = effort_from_high_speed(self.controller.GetArmHighSpdInfoMsgs())
         except (AttributeError, TypeError, ValueError):
@@ -72,13 +99,20 @@ class PiperController(ArmController):
         x, y, z, rx, ry, rz = position*1000*1000
         x, y, z, rx, ry, rz = int(x), int(y), int(z), int(rx), int(ry), int(rz)
 
+        self.control_mode = "position"
+        self._drive_mit = False
         self.controller.MotionCtrl_2(0x01, 0x00, 100, 0x00)
         self.controller.EndPoseCtrl(x, y, z, rx, ry, rz)
     
     def set_joint(self, joint):
+        if self.control_mode == "impedance" and self.mit_servo_ready():
+            self.note_joint_target(joint)
+            return
         j1, j2, j3 ,j4, j5, j6 = joint * 57295.7795 #1000*180/3.1415926
         j1, j2, j3 ,j4, j5, j6 = int(j1), int(j2), int(j3), int(j4), int(j5), int(j6)
         
+        self.control_mode = "position"
+        self._drive_mit = False
         self.controller.MotionCtrl_2(0x01, 0x01, 100, 0x00)
         self.controller.JointCtrl(j1, j2, j3, j4, j5, j6)
 
@@ -90,11 +124,13 @@ class PiperController(ArmController):
     def set_mit(self, q_des, kp, kd, qd_des=None, tau_ff=None):
         """piper_sdk.JointMitCtrl。先切到 MIT：MotionCtrl_2 的 move_mode=0x04，is_mit_mode=0xAD。
 
-        不传 tau_ff 时前馈是 0。这个控制器没有 URDF，重力要调用方自己放进 tau_ff。
+        不传 tau_ff 时前馈是 0。重力补偿走另一个模式，不写进这条显式 MIT。
         驱动侧 τ = kp (q_d - q) + kd (qd_d - qd) + t_ref。
         """
         self._require_arm()
         parts = pack_joint_mit(q_des, kp, kd, qd_des, tau_ff, _DOF)
+        self.control_mode = "mit"
+        self._drive_mit = True
         self.controller.MotionCtrl_2(0x01, 0x04, 100, 0xAD)
         for index in range(_DOF):
             self.controller.JointMitCtrl(
@@ -118,7 +154,24 @@ class PiperController(ArmController):
             info["result"] = self._last_result
         return info
 
+    def _send_mit_refresh(self, terms: dict) -> None:
+        self._require_arm()
+        if not self._drive_mit:
+            self.controller.MotionCtrl_2(0x01, 0x04, 100, 0xAD)
+            self._drive_mit = True
+        for index in range(_DOF):
+            self.controller.JointMitCtrl(
+                index + 1,
+                float(terms["q_des"][index]),
+                float(terms["qd_des"][index]),
+                float(terms["kp"][index]),
+                float(terms["kd"][index]),
+                float(terms["tau_ff"][index]),
+            )
+
     def handle_runtime_op(self, data: dict) -> None:
+        if self.dispatch_servo_op(data):
+            return
         op = str(data.get("op") or "")
         if op != "mit":
             raise ValueError(f"未知操作 {op}")

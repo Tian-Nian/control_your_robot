@@ -93,6 +93,8 @@ def call(component: str, payload: str, *, is_delta: bool, timeout: float) -> int
     except RuntimeError as exc:
         _print_json({"accepted": False, "seq": None, "error": str(exc), "state": None})
         return 1
+    if data.get("op") == "reset" and timeout == 2.0:
+        timeout = 15.0
     try:
         result = session.call(component, data, is_delta=is_delta, timeout=timeout)
     finally:
