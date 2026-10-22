@@ -16,10 +16,8 @@ class VisionSensor(Sensor):
         image = self.get_image()
         if "color" in self.collect_info:
             if getattr(self, "is_jpeg", True):
-                import cv2
-                success, encoded_image = cv2.imencode('.jpg', image["color"])
-                jpeg_data = encoded_image.tobytes()
-                image["color"] = jpeg_data
+                from robot.data.rgb_jpeg import encode_rgb_jpeg
+                image["color"] = encode_rgb_jpeg(image["color"])
             image_info["color"] = image["color"]
         if "depth" in self.collect_info:
             image_info["depth"] = image["depth"]

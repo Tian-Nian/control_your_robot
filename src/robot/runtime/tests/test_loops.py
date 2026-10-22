@@ -462,6 +462,7 @@ def test_observation_contract_stores_camera_jpeg():
         assert len(obs["state"]["left_arm_joint_state"]) == 6
         color = obs["vision"]["cam_head"]["color"]
         assert color[:2] == b"\xff\xd8"
+        assert b"XPL-RGB1" in color
     finally:
         if env is not None:
             env.close()

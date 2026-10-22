@@ -156,17 +156,9 @@ def _vision(obs: dict) -> dict:
 
 
 def _jpeg(color) -> bytes:
-    if isinstance(color, (bytes, bytearray)):
-        return bytes(color)
-    array = np.asarray(color)
-    if array.ndim == 1 and array.dtype == np.uint8:
-        return array.tobytes()
-    import cv2
+    from robot.data.rgb_jpeg import encode_rgb_jpeg
 
-    ok, encoded = cv2.imencode(".jpg", array)
-    if not ok:
-        raise RuntimeError("图像不能收成 JPEG")
-    return encoded.tobytes()
+    return encode_rgb_jpeg(color)
 
 
 def _plain(value):

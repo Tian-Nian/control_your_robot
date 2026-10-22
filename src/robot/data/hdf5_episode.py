@@ -107,12 +107,9 @@ def _compress(fields: dict) -> dict:
 
 
 def _jpeg(image: np.ndarray) -> bytes:
-    import cv2
+    from robot.data.rgb_jpeg import encode_rgb_jpeg
 
-    ok, encoded = cv2.imencode(".jpg", image)
-    if not ok:
-        raise RuntimeError("图像不能收成 JPEG")
-    return encoded.tobytes()
+    return encode_rgb_jpeg(image)
 
 
 def _write_config(folder: Path, task: str, save_dir, save_freq: float, mapping: dict) -> None:
