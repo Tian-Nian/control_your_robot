@@ -344,7 +344,7 @@ class PiperAgxController(MitServo, ArmController):
         self._teleop_event = None
         self._teleop_stop_event = None
 
-    def set_up(self, can: str, arm_type=ArmModel.PIPER, teleop=False, firmware_version=PiperFW.V183, control_mode=None, joint_K=None, joint_D=None):
+    def set_up(self, can: str, arm_type=ArmModel.PIPER, teleop=False, firmware_version=PiperFW.V183, control_mode=None, joint_K=None, joint_D=None, tool_in_urdf: bool = False):
         self._setup_debug_loggers()
         firmware_version = normalize_piper_firmware_version(firmware_version)
 
@@ -368,6 +368,7 @@ class PiperAgxController(MitServo, ArmController):
                 self.teleop_gravity_config,
                 joint_K=joint_K,
                 joint_D=joint_D,
+                tool_in_urdf=tool_in_urdf,
             )
         )
 
@@ -400,6 +401,7 @@ class PiperAgxController(MitServo, ArmController):
         if target in ("gravity_compensation", "impedance"):
             law = self.require_mit_servo()
             if target == "impedance":
+                law.require_payload()
                 law.require_gains()
             self.control_mode = target
             if getattr(self, "end_effector", None) is None:

@@ -47,10 +47,25 @@ class ArmServoLaw:
         self.joint_D = None if joint_D is None else _column(joint_D, self.dofs, "joint_D")
         self.mass = 0.0
         self.com = np.zeros(3)
+        self.payload_ready = False
 
     def set_payload(self, mass, com) -> None:
         self.mass = float(mass)
         self.com = np.asarray(com, dtype=float).reshape(3).copy()
+        self.payload_ready = True
+
+    def accept_modeled_payload(self) -> None:
+        """URDF 已经包含末端，不再另加一份法兰负载。"""
+        self.mass = 0.0
+        self.com = np.zeros(3)
+        self.payload_ready = True
+
+    def require_payload(self) -> None:
+        if not self.payload_ready:
+            raise ValueError(
+                "还没标定末端负载，不能进阻抗。"
+                "先 set_payload；负载已经写在 URDF 里时，在 setup 里设 tool_in_urdf。"
+            )
 
     def set_gains(self, joint_K, joint_D) -> None:
         self.joint_K = _column(joint_K, self.dofs, "joint_K")
@@ -96,6 +111,7 @@ class ArmServoLaw:
         }
 
     def impedance_terms(self, q, q_des) -> dict:
+        self.require_payload()
         self.require_gains()
         joint = _column(q, self.dofs, "joint")
         return {
@@ -270,8 +286,16 @@ def _column(value, dofs: int, name: str) -> np.ndarray:
     return array.copy()
 
 
-def law_from_piper_profile(urdf_path, config, *, joint_K=None, joint_D=None, apply_scale: bool = True) -> ArmServoLaw:
-    return ArmServoLaw(
+def law_from_piper_profile(
+    urdf_path,
+    config,
+    *,
+    joint_K=None,
+    joint_D=None,
+    apply_scale: bool = True,
+    tool_in_urdf: bool = False,
+) -> ArmServoLaw:
+    law = ArmServoLaw(
         Path(urdf_path),
         torque_scale=config.torque_scale,
         torque_limit=config.torque_limit,
@@ -280,3 +304,6 @@ def law_from_piper_profile(urdf_path, config, *, joint_K=None, joint_D=None, app
         joint_D=joint_D,
         apply_scale=apply_scale,
     )
+    if tool_in_urdf:
+        law.accept_modeled_payload()
+    return law

@@ -118,6 +118,14 @@ def test_piper_sim_gravity_holds_and_impedance_tracks():
     with pytest.raises(ValueError, match="cartesian"):
         arm.set_control_mode("cartesian")
 
+    loaded = PiperSimController("loaded", spawn=False)
+    loaded.set_up(control_mode="position", plant_mass=0.35, plant_com=[0.02, -0.01, 0.06])
+    with pytest.raises(ValueError, match="末端负载"):
+        loaded.set_control_mode("impedance")
+    loaded.set_identified_payload(0.35, [0.02, -0.01, 0.06])
+    loaded.set_control_mode("impedance")
+    assert loaded.control_mode == "impedance"
+
 
 def test_piper_sim_position_teleports_and_mit_integrates():
     pytest.importorskip("pinocchio")
@@ -254,6 +262,11 @@ def test_mit_servo_refreshes_gravity_and_impedance_without_integrating():
     law = ArmServoLaw(arm.urdf_path, apply_scale=False)
     drive = Drive()
     drive.bind_mit_servo(law)
+    drive.control_mode = "impedance"
+    with pytest.raises(ValueError, match="末端负载"):
+        drive.servo_step(0.02)
+    drive.control_mode = "gravity_compensation"
+    drive.sent.clear()
     drive.servo_step(0.02)
     assert drive.control_mode == "gravity_compensation"
     assert np.allclose(drive.sent[0]["kp"], 0.0)

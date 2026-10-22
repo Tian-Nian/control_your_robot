@@ -74,7 +74,7 @@ class PiperSimController(ArmController):
         self._tick = 0
         self._last_result = {}
 
-    def set_up(self, control_mode="position", joint_K=None, joint_D=None, plant_mass=0.0, plant_com=None, input=None):
+    def set_up(self, control_mode="position", joint_K=None, joint_D=None, plant_mass=0.0, plant_com=None, tool_in_urdf=False, input=None):
         import pinocchio as pin
 
         self.model = pin.buildModelFromUrdf(self.urdf_path)
@@ -103,6 +103,8 @@ class PiperSimController(ArmController):
             joint_D=self._joint_D,
             apply_scale=False,
         )
+        if tool_in_urdf or abs(self._plant_mass) < 1e-9:
+            self._servo_law.accept_modeled_payload()
         self.set_control_mode(control_mode)
         self._flange_id = self.model.getFrameId("flange")
         self._refresh()
@@ -129,6 +131,11 @@ class PiperSimController(ArmController):
 
     def set_control_mode(self, mode: str) -> str:
         target = reject_unsupported_mode(self.name, mode, self.supported_modes)
+        if target == "impedance":
+            law = getattr(self, "_servo_law", None)
+            if law is None:
+                raise ValueError(f"{self.name} 没有 URDF，不能进阻抗")
+            law.require_payload()
         entering = target != self.control_mode
         self.control_mode = target
         if self.q is not None and entering and target != "position":
@@ -295,6 +302,16 @@ class PiperSimController(ArmController):
         """仿真里真实的法兰负载。补偿模型要等辨识之后才知道它。"""
         self._plant_mass = float(mass)
         self._plant_com = np.asarray(com, dtype=float).reshape(3)
+        law = getattr(self, "_servo_law", None)
+        if law is None:
+            return
+        if abs(self._plant_mass) < 1e-9 and abs(law.mass) < 1e-9:
+            law.accept_modeled_payload()
+            return
+        law.payload_ready = False
+        if self.control_mode == "impedance":
+            self.control_mode = "position"
+            self.fault = "末端负载变了，已退出阻抗。重新辨识并 set_payload 后再进入。"
 
     def _payload_torque(self, mass, com) -> np.ndarray:
         if abs(float(mass)) < 1e-12:

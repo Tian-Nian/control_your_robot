@@ -157,7 +157,7 @@ cyr call left_arm '{"op":"reset","start_state":[0, 1.3, -1, 0, 0.5, 0]}'
 | `position` | 各臂 | 关节目标交给驱动或仿真。PiperSim 在这个模式下会直接改到目标 |
 | `mit` | Piper、PiperAgx、Y1、PiperSim | 下发 `kp`、`kd`、`q_des`、`qd_des`、`tau_ff` |
 | `gravity_compensation` | 能发关节 MIT、并且有 URDF 的臂 | `kp = 0`，`kd` 用该臂的小阻尼，`tau_ff` 是连杆重力加辨识出的法兰负载。真机再乘 `torque_scale`。主机不积分 |
-| `impedance` | 同上，外加 Marvin | MIT 臂的 `kp`、`kd` 用配置里的 `joint_K`、`joint_D`，`tau_ff` 仍是那份重力。真机不套用仿真默认的 K、D |
+| `impedance` | 同上，外加 Marvin | MIT 臂的 `kp`、`kd` 用配置里的 `joint_K`、`joint_D`，`tau_ff` 仍是那份重力。没标定末端，或没有 `tool_in_urdf`，拒绝进入。真机不套用仿真默认的 K、D |
 | `cartesian`、`force` | Marvin | 驱动自己的笛卡尔阻抗和末端力，不改名成上面四种 |
 
 能发关节 MIT 的臂继承 `MitServo`。Piper 和 Y1 在控制周期里刷新指令。PiperAgx 仍用原来的 200 Hz 线程，不再另算一份 URDF 重力。没有 URDF 时，重力和阻抗会被拒绝。Piper 的 URDF 写在 `setup.urdf`。Marvin 没有关节 MIT，阻抗用 `set_imp_joint_state`，负载用 `set_tool` 的 10 个工具动力学参数。
@@ -168,7 +168,7 @@ cyr call left_arm '{"op":"reset","start_state":[0, 1.3, -1, 0, 0.5, 0]}'
 
 重力补偿辨识的是法兰负载的质量 `m` 和质心 `c`，不是惯量。臂先停在 `position`，用 `cyr call` 下发至少 8 个腕朝向差得开的关节目标，停稳后 `collect.py` 记力矩。残差是测到的力矩减去连杆 `g(q)`。结果用 `{"op":"set_payload"}` 写回，再切到 `gravity_compensation`。换夹爪后重新采集。负载已经写在 URDF 里时，检查加 `--tool-in-urdf`，不必采集。
 
-关节阻抗不辨识 K、D。真机把 `joint_K` 和 `joint_D` 写在 `setup` 里。仿真默认值只属于 `piper_sim_impedance.yml`。
+关节阻抗不辨识 K、D。真机把 `joint_K` 和 `joint_D` 写在 `setup` 里。仿真默认值只属于 `piper_sim_impedance.yml`。MIT 臂在 `set_payload` 之前不能切到阻抗；负载已经在 URDF 里时写 `tool_in_urdf: true`。那份仿真配置就是这样声明的。
 
 ```bash
 cyr start --config config/runtime/piper_sim_gravity.yml

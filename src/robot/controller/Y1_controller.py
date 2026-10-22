@@ -49,7 +49,7 @@ class Y1Controller(MitServo, ArmController):
         self._drive_mit = False
         self.urdf_path = None
 
-    def set_up(self, can: str, arm_end_type=3, teleop=False, control_mode=None, joint_K=None, joint_D=None):
+    def set_up(self, can: str, arm_end_type=3, teleop=False, control_mode=None, joint_K=None, joint_D=None, tool_in_urdf: bool = False):
         Y1SDKInterface, _control_mode, _command_cls = _load_y1()
         if arm_end_type == 0:
             urdf_path = f"{package_path}/urdf/y10804.urdf"
@@ -62,15 +62,16 @@ class Y1Controller(MitServo, ArmController):
 
         self.urdf_path = urdf_path
         if Path(urdf_path).is_file():
-            self.bind_mit_servo(
-                ArmServoLaw(
-                    urdf_path,
-                    mit_kd=DEFAULT_MIT_KD,
-                    joint_K=joint_K,
-                    joint_D=joint_D,
-                    apply_scale=True,
-                )
+            law = ArmServoLaw(
+                urdf_path,
+                mit_kd=DEFAULT_MIT_KD,
+                joint_K=joint_K,
+                joint_D=joint_D,
+                apply_scale=True,
             )
+            if tool_in_urdf:
+                law.accept_modeled_payload()
+            self.bind_mit_servo(law)
         self.controller = Y1SDKInterface(
             can_id=can,
             urdf_path=urdf_path,
@@ -91,6 +92,7 @@ class Y1Controller(MitServo, ArmController):
         if target in ("gravity_compensation", "impedance"):
             law = self.require_mit_servo()
             if target == "impedance":
+                law.require_payload()
                 law.require_gains()
             self.control_mode = target
             self._mode = target

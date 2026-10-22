@@ -27,3 +27,5 @@ python toolkits/impedance/run.py
 ```
 
 仿真的 `joint_K` 默认 `[16, 16, 16, 8, 8, 8]`，`joint_D` 默认 `[1.8, 1.8, 1.8, 1.8, 1.8, 1.8]`。力矩里已经包含 `g(q)`。真机不套用这组默认值，`joint_K` 和 `joint_D` 要写在配置里，前馈仍是重力补偿。
+
+没标定末端就不能进阻抗。`set_payload` 之后才放行。负载的质量和质心已经写在 URDF 里时，`setup` 设 `tool_in_urdf: true`，这时不再另加一份法兰负载。`piper_sim_impedance.yml` 属于这一种：仿真模型里没有额外末端。

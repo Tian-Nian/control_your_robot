@@ -65,6 +65,11 @@ def evaluate(components, states, service_up=True, confirm_ready=False) -> dict:
         questions.append(
             f"{name} 当前模式是 {mode!r}。用 config/runtime/piper_sim_impedance.yml 启动。"
         )
+    if item.get("class_name") != "PiperSimController" and not setup.get("tool_in_urdf"):
+        ask.append(
+            f"{name} 的末端负载标定了吗？没有就先采集并 set_payload，再进阻抗。"
+            "负载已经写在 URDF 里时，setup 写 tool_in_urdf。"
+        )
     if item.get("class_name") != "PiperSimController" and not confirm_ready:
         ask.append(f"{name} 已上电、工作空间已清空吗？确认后给 check.py 加上 --confirm-ready。")
     blocking = questions + ([] if confirm_ready or not ask else ask)

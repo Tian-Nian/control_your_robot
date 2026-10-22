@@ -47,7 +47,7 @@ description: >-
 
 仿真里的速度保护记在状态的 `servo_fault`，不要让它把服务打进安全锁存。
 
-能发关节 MIT 的臂继承 `MitServo`。重力和阻抗由它每个周期算出 kp、kd、q_des 和前馈，再交给驱动。`servo_step` 只刷新这条指令，不在主机上积分。PiperAgx 用原来的 200 Hz 线程刷新，不在 `servo_step` 里再发一份。没有 URDF 时，`set_control_mode` 拒绝重力和阻抗。真机的 `joint_K`、`joint_D` 必须写在配置里。Marvin 没有关节 MIT，不走这个基类。
+能发关节 MIT 的臂继承 `MitServo`。重力和阻抗由它每个周期算出 kp、kd、q_des 和前馈，再交给驱动。`servo_step` 只刷新这条指令，不在主机上积分。PiperAgx 用原来的 200 Hz 线程刷新，不在 `servo_step` 里再发一份。没有 URDF 时，`set_control_mode` 拒绝重力和阻抗。真机的 `joint_K`、`joint_D` 必须写在配置里。没 `set_payload`、也没 `tool_in_urdf` 时，拒绝进入阻抗。Marvin 没有关节 MIT，不走这个基类。
 
 ## 工具包
 

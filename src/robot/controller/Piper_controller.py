@@ -42,7 +42,7 @@ class PiperController(MitServo, ArmController):
         self._last_result = {}
         self._drive_mit = False
 
-    def set_up(self, can: str, control_mode: str = "position", urdf=None, joint_K=None, joint_D=None):
+    def set_up(self, can: str, control_mode: str = "position", urdf=None, joint_K=None, joint_D=None, tool_in_urdf: bool = False):
         piper = C_PiperInterface_V2(can)
         piper.ConnectPort()
         piper.EnableArm(7)
@@ -51,7 +51,9 @@ class PiperController(MitServo, ArmController):
         if urdf:
             arm_type = "piper_x" if "piper_x" in str(urdf).lower() else "piper"
             config = PiperTeleopGravityConfig.for_arm_urdf(arm_type, urdf, env=os.environ)
-            self.bind_mit_servo(law_from_piper_profile(urdf, config, joint_K=joint_K, joint_D=joint_D))
+            self.bind_mit_servo(
+                law_from_piper_profile(urdf, config, joint_K=joint_K, joint_D=joint_D, tool_in_urdf=tool_in_urdf)
+            )
         self.set_control_mode(control_mode)
 
     def set_control_mode(self, mode: str) -> str:
@@ -60,6 +62,7 @@ class PiperController(MitServo, ArmController):
         if target in ("gravity_compensation", "impedance"):
             law = self.require_mit_servo()
             if target == "impedance":
+                law.require_payload()
                 law.require_gains()
             self.control_mode = target
             if self.controller is not None:

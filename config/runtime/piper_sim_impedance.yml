@@ -11,6 +11,7 @@ components:
       spawn: true
     setup:
       control_mode: impedance
+      tool_in_urdf: true
       joint_K: [16, 16, 16, 8, 8, 8]
       joint_D: [1.8, 1.8, 1.8, 1.8, 1.8, 1.8]
     publish: [joint, eef, gripper, result, control_mode, servo_fault]

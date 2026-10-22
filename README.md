@@ -157,7 +157,7 @@ An `eef` command with no `joint`, on a component that has a body, is solved for 
 | `position` | every arm | A joint goal to the drive or the simulator. PiperSim in this mode moves straight to the goal |
 | `mit` | Piper, PiperAgx, Y1, PiperSim | `kp`, `kd`, `q_des`, `qd_des`, `tau_ff` |
 | `gravity_compensation` | arms that can send joint MIT and have a URDF | `kp = 0`, the arm's small `kd`, and `tau_ff` equal to link gravity plus the identified flange load. A real arm then multiplies `torque_scale`. The host does not integrate |
-| `impedance` | the same arms, plus Marvin | On an MIT arm, `kp` and `kd` are `joint_K` and `joint_D` from the config, and `tau_ff` is still that gravity torque. Real arms do not reuse the simulator's default gains |
+| `impedance` | the same arms, plus Marvin | On an MIT arm, `kp` and `kd` are `joint_K` and `joint_D` from the config, and `tau_ff` is still that gravity torque. Impedance is refused until `set_payload`, or until `tool_in_urdf` says the load is already in the URDF. Real arms do not reuse the simulator's default gains |
 | `cartesian`, `force` | Marvin | The drive's own Cartesian impedance and end-effector force. These names stay as they are |
 
 An arm that can send joint MIT inherits `MitServo`. Piper and Y1 refresh the command on the control tick. PiperAgx keeps its 200 Hz thread and no longer computes a second URDF gravity. Without a URDF, gravity and impedance are rejected. Piper reads the URDF from `setup.urdf`. Marvin has no joint MIT. Its impedance is `set_imp_joint_state`, and the load is the 10-number tool dynamics passed to `set_tool`.
@@ -168,7 +168,7 @@ Each toolkit's steps are in `toolkits/<name>/agent.md`. Run that directory's `ch
 
 Gravity identification fits flange mass `m` and center of mass `c`. Inertia is not observable from a static hold. Leave the arm in `position`, send at least eight joint targets with different wrist orientations through `cyr call`, and let `collect.py` record torque after the arm stops. The residual is measured torque minus link `g(q)`. The fit is written back with `{"op":"set_payload"}`, then the mode switches to `gravity_compensation`. Collect again after changing the gripper. If the load is already in the URDF, pass `--tool-in-urdf` and skip collection.
 
-Joint impedance does not fit `K` and `D`. On a real arm those values belong in `setup`. The simulator defaults exist only in `piper_sim_impedance.yml`.
+Joint impedance does not fit `K` and `D`. On a real arm those values belong in `setup`. The simulator defaults exist only in `piper_sim_impedance.yml`. An MIT arm will not enter impedance before `set_payload`. If the load is already in the URDF, set `tool_in_urdf: true`. That simulator file does.
 
 ```bash
 cyr start --config config/runtime/piper_sim_gravity.yml
