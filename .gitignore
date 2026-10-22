@@ -22,7 +22,7 @@ third_party/dr/
 execution_logs/
 output/
 data/check_data.json
-data/
+/data/
 policy/weights
 realsense_captures/
 piper_scripts/

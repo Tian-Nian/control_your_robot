@@ -664,5 +664,8 @@ components:
         stop.set()
         thread.join(timeout=2)
         bus.unlink()
+    from robot.runtime.frames import compose_delta
+
     reached = body.flange_pose("right", moved)
-    assert reached[0] - flange[0] == pytest.approx(0.02, abs=0.008)
+    expected = compose_delta(flange, [0.02, 0.0, 0.0])
+    assert np.allclose(reached[:3], expected[:3], atol=0.008)

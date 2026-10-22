@@ -70,7 +70,9 @@ class ArmController(Controller):
                 if key == "joint":
                     self.set_joint(np.array(now_state["joint"] + value))
                 elif key == "eef":
-                    self.set_position(np.array(now_state["eef"] + value))
+                    from robot.runtime.frames import compose_delta
+
+                    self.set_position(compose_delta(now_state["eef"], value))
         else:
             for key, value in payload.items():
                 if key == "joint":

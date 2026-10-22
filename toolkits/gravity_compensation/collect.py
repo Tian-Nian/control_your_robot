@@ -71,7 +71,10 @@ def collect_live(session, arm_name: str) -> dict:
             if not called.get("accepted"):
                 print(called.get("error") or "关节目标没有被接受")
                 continue
-        samples.append(_sample(session, arm_name))
+        sample = _sample(session, arm_name)
+        if sample is None:
+            continue
+        samples.append(sample)
         print(
             f"关节 {np.array2string(samples[-1]['joint'], precision=3)} "
             f"力矩 {np.array2string(samples[-1]['torque'], precision=3)}"
@@ -98,8 +101,10 @@ def _parse_joint(line: str):
     return values
 
 
-def _sample(session, arm_name: str) -> dict:
+def _sample(session, arm_name: str) -> dict | None:
     called = session.call(arm_name, {"op": "hold_torque"}, timeout=2.0)
+    if not called.get("accepted"):
+        return None
     data = ((called.get("state") or {}).get("data") or {})
     result = data.get("result") or {}
     if "jacobian" in result and "link_gravity" in result:

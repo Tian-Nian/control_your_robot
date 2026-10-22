@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
+import logging
 import time
 
 from robot.runtime.client import RuntimeClient
 from robot.runtime.config import RuntimeConfig, load_config
 from robot.runtime.discover import live_records
 from robot.runtime.present import summarize_value
-from robot.runtime.transport import SafetyStopError
+from robot.runtime.transport import ControlBusyError, SafetyStopError
 
 
 class Session:
     def __init__(self, client: RuntimeClient, config: RuntimeConfig):
         self._client = client
         self._config = config
+        self._token = 0
 
     @classmethod
     def attach(cls, name: str | None = None) -> Session:
@@ -53,21 +55,60 @@ class Session:
         components = {}
         for item in self._config.components:
             components[item.name] = _component_view(self._client.read_state(item.name), now_ns)
-        return {"safety": safety, "components": components}
+        return {"safety": safety, "control": self._client.read_control(), "components": components}
 
-    def call(self, name: str, data: dict, is_delta: bool = False, timeout: float = 2.0) -> dict:
+    def acquire_control(self, role: str, lease_s: float = 2.0) -> int:
+        token = self._client.acquire_control(role, lease_s)
+        self._token = int(token)
+        return self._token
+
+    def renew_control(self, token: int | None = None, lease_s: float = 2.0) -> bool:
+        current = self._token if token is None else int(token)
+        return self._client.renew_control(current, lease_s)
+
+    def release_control(self, token: int | None = None) -> bool:
+        current = self._token if token is None else int(token)
+        released = self._client.release_control(current)
+        if released and self._token == current:
+            self._token = 0
+        return released
+
+    def call(self, name: str, data: dict, is_delta: bool = False, timeout: float = 2.0, token: int | None = None) -> dict:
         spec = self._spec(name)
         if spec is None:
             return _result(False, None, f"没有组件 {name}", None)
         if not spec["accepts_commands"]:
             return _result(False, None, "组件不接受命令", self._state(name))
+        writer = self._token if token is None else int(token)
         try:
-            seq = self._client.write_cmd(name, data, is_delta=is_delta)
+            seq = self._client.write_cmd(name, data, is_delta=is_delta, token=writer)
+        except ControlBusyError as exc:
+            _warn_busy(name, exc)
+            return _result(False, None, str(exc), self._state(name))
         except SafetyStopError as exc:
             return _result(False, None, str(exc), self._state(name))
         except KeyError as exc:
             return _result(False, None, str(exc), None)
         return self._wait(name, seq, timeout)
+
+    def write_target(self, name: str, data: dict, token: int | None = None) -> dict:
+        """写下最新目标。成功只表示已经盖住上一份，不表示臂已经走到。"""
+        spec = self._spec(name)
+        if spec is None:
+            return _result(False, None, f"没有组件 {name}", None)
+        if not spec["accepts_commands"]:
+            return _result(False, None, "组件不接受命令", self._state(name))
+        writer = self._token if token is None else int(token)
+        try:
+            seq = self._client.write_stream(name, data, token=writer)
+        except ControlBusyError as exc:
+            _warn_busy(name, exc)
+            return _result(False, None, str(exc), self._state(name))
+        except SafetyStopError as exc:
+            return _result(False, None, str(exc), self._state(name))
+        except (KeyError, ValueError) as exc:
+            return _result(False, None, str(exc), self._state(name))
+        return _result(True, seq, "", self._state(name))
 
     def reset(self, name: str, start_state=None, timeout: float = 15.0) -> dict:
         payload = {"op": "reset"}
@@ -121,6 +162,10 @@ class Session:
         except FileNotFoundError:
             return {"latched": True, "reason": "共享内存不存在"}
         return {"latched": bool(safety.get("latched")), "reason": str(safety.get("reason") or "")}
+
+
+def _warn_busy(name: str, exc: ControlBusyError) -> None:
+    logging.getLogger("cyr").warning("%s 的控制被拒绝：%s", name, exc)
 
 
 def _select_record(records: list[dict], name: str | None) -> dict:

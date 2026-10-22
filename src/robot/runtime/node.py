@@ -302,6 +302,8 @@ def _init_runtime_state(component, spec: dict) -> None:
     component._cyr_last_cmd_error = ""
     component._cyr_tracking_err = 0.0
     component._cyr_motion_timeout_s = float((spec.get("motion") or {}).get("timeout_s") or 0.0)
+    component._cyr_stream_seq = 0
+    component._cyr_stream_target = None
     component._cyr_cycles = deque()
 
 
@@ -344,19 +346,24 @@ def _advance(bus: Bus, spec: dict, component, log) -> None:
     if bus.read_safety()["latched"]:
         return
     command = bus.pop_cmd(spec["name"])
-    if command is None:
+    if command is not None:
+        component._cyr_last_cmd_seq = int(command["seq"])
+        data = command.get("data")
+        if isinstance(data, dict) and data.get("op") == "reset":
+            frame = bus.read_stream(spec["name"])
+            component._cyr_stream_reset_seq = 0 if frame is None else int(frame["seq"])
+        try:
+            _apply_command(spec, component, command)
+        except CommandRejected as exc:
+            component._cyr_motion = None
+            component._cyr_motion_hold = True
+            component._cyr_last_cmd_error = str(exc)
+            log.error("%s 拒绝命令: %s", spec["name"], exc)
+            return
+        if getattr(component, "_cyr_motion", None) is None:
+            component._cyr_last_cmd_error = ""
         return
-    component._cyr_last_cmd_seq = int(command["seq"])
-    try:
-        _apply_command(spec, component, command)
-    except CommandRejected as exc:
-        component._cyr_motion = None
-        component._cyr_motion_hold = True
-        component._cyr_last_cmd_error = str(exc)
-        log.error("%s 拒绝命令: %s", spec["name"], exc)
-        return
-    if getattr(component, "_cyr_motion", None) is None:
-        component._cyr_last_cmd_error = ""
+    _follow_stream(bus, spec, component)
 
 
 def _apply_command(spec: dict, component, command: dict) -> None:
@@ -535,12 +542,16 @@ def _solve_eef(spec: dict, component, eef, is_delta: bool):
         raw = np.asarray(eef, dtype=float).reshape(-1)
     except (TypeError, ValueError) as exc:
         raise CommandRejected("末端目标必须是数字") from exc
-    target = raw
     if is_delta:
+        from robot.runtime.frames import compose_delta
+
         pose = np.asarray(body.flange_pose(arm, current), dtype=float).reshape(-1)
-        target = pose.copy()
-        count = min(target.size, raw.size)
-        target[:count] = pose[:count] + raw[:count]
+        try:
+            target = compose_delta(pose, raw)
+        except ValueError as exc:
+            raise CommandRejected(str(exc)) from exc
+    else:
+        target = raw
     gate = spec.get("gate") or {}
     solved = body.ik(arm, current, target, max_error_m=_cfg_float(gate, "max_fk_error_m", 0.008))
     return solved, target
@@ -604,6 +615,108 @@ def _arm_name(spec: dict) -> str:
     if name.endswith("_arm"):
         return name[: -len("_arm")]
     return name
+
+
+def _follow_stream(bus: Bus, spec: dict, component) -> None:
+    """每拍朝最新目标走一步。步长超限就削短，不拒绝，也不锁住组件。"""
+    if getattr(component, "_cyr_motion_hold", False):
+        return
+    if not bus.read_control()["held"]:
+        return
+    frame = bus.read_stream(spec["name"])
+    if frame is None:
+        return
+    seq = int(frame["seq"])
+    if seq == int(getattr(component, "_cyr_stream_reset_seq", 0) or 0):
+        component._cyr_stream_target = None
+        component._cyr_stream_seq = seq
+        return
+    if seq != int(getattr(component, "_cyr_stream_seq", 0) or 0):
+        component._cyr_stream_target = frame["data"]
+        component._cyr_stream_seq = seq
+    target = getattr(component, "_cyr_stream_target", None)
+    if not isinstance(target, dict):
+        return
+    try:
+        payload = _stream_payload(spec, component, target)
+    except CommandRejected as exc:
+        component._cyr_last_cmd_error = str(exc)
+        return
+    if not payload:
+        return
+    move = getattr(component, "move", None)
+    if move is None:
+        return
+    move(payload, is_delta=False)
+    component._cyr_last_cmd_error = ""
+
+
+def _stream_payload(spec: dict, component, target: dict) -> dict:
+    payload = {}
+    if "gripper" in target:
+        payload["gripper"] = target["gripper"]
+    goal = None
+    if "joint" in target:
+        goal = np.asarray(target["joint"], dtype=float).reshape(-1)
+    elif "eef" in target:
+        solved = _solve_eef(spec, component, target["eef"], False)
+        if solved is None:
+            payload["eef"] = np.asarray(target["eef"], dtype=float).reshape(-1).tolist()
+        else:
+            goal = np.asarray(solved[0], dtype=float).reshape(-1)
+    if goal is None:
+        return payload
+    current = _current_joint(component)
+    if current.size != goal.size:
+        raise CommandRejected(f"关节长度 {goal.size}，当前是 {current.size}")
+    step = _stream_limit(spec)
+    delta = goal - current
+    if np.isfinite(step):
+        delta = np.clip(delta, -step, step)
+    point = _clip_limits(spec, component, current + delta)
+    if _stream_blocked(spec, component, point):
+        raise CommandRejected("间隙")
+    payload["joint"] = point.tolist()
+    return payload
+
+
+def _stream_limit(spec: dict) -> float:
+    gate = spec.get("gate") or {}
+    motion = spec.get("motion") or {}
+    if isinstance(gate, dict) and gate.get("max_step_rad") is not None:
+        return float(gate["max_step_rad"])
+    if isinstance(motion, dict) and motion.get("max_step_rad") is not None:
+        return float(motion["max_step_rad"])
+    return float("inf")
+
+
+def _clip_limits(spec: dict, component, point: np.ndarray) -> np.ndarray:
+    body = getattr(component, "_cyr_body", None)
+    arm = _arm_name(spec)
+    if body is not None and arm in body.arm_names():
+        lower, upper = body.limits(arm)
+    else:
+        gate = spec.get("gate") or {}
+        if "lower" not in gate or "upper" not in gate:
+            return point
+        lower = np.asarray(gate["lower"], dtype=float).reshape(-1)
+        upper = np.asarray(gate["upper"], dtype=float).reshape(-1)
+    count = min(point.size, lower.size, upper.size)
+    point = point.copy()
+    point[:count] = np.clip(point[:count], lower[:count], upper[:count])
+    return point
+
+
+def _stream_blocked(spec: dict, component, point: np.ndarray) -> bool:
+    gate = spec.get("gate") or {}
+    minimum = float(gate.get("min_clearance_m") or 0.0)
+    if minimum <= 0:
+        return False
+    body = getattr(component, "_cyr_body", None)
+    arm = _arm_name(spec)
+    if body is None or arm not in body.arm_names():
+        return False
+    return float(body.clearance(arm, point)) < minimum
 
 
 def _current_joint(component) -> np.ndarray:

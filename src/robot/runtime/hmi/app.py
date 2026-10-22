@@ -10,6 +10,7 @@ from robot.runtime.discover import live_records
 from robot.runtime.hmi.model import HmiModel
 from robot.runtime.hmi.render import frame
 from robot.runtime.service import stop
+from robot.runtime.transport import BusCorruptError
 
 
 def run_hmi() -> int:
@@ -83,8 +84,14 @@ def _poll(model: HmiModel, client: RuntimeClient | None, attached: str) -> tuple
             model.set_link(False, int(record["pid"]), shm_name)
             model.notice = "共享内存不存在，请重启服务"
             return None, ""
+        except BusCorruptError as exc:
+            model.set_link(False, int(record["pid"]), shm_name)
+            model.notice = str(exc)
+            return None, ""
         attached = shm_name
     model.set_link(True, int(record["pid"]), shm_name)
+    if client.version < 3:
+        model.notice = "服务仍是第 2 版，可以查看。遥操和部署需要先 cyr restart"
     model.set_names([str(name) for name in record.get("components") or []])
     try:
         safety = client.read_safety()

@@ -128,6 +128,69 @@ def test_zombie_is_not_alive():
         os.waitpid(pid, 0)
 
 
+def test_version_two_segment_can_be_read_but_not_streamed():
+    from robot.utils.base.msgpack_numpy import packb
+
+    from robot.runtime.transport import (
+        CMD_SLOT_MAX,
+        MAGIC,
+        STATUS_MAX,
+        LayoutMismatchError,
+        _CMD_HDR,
+        _DIR,
+        _HEADER,
+        _SAFETY,
+        _SLOT_HDR,
+        _align,
+        _open_shared_memory,
+        _safety_offset,
+    )
+
+    shm_name = _name()
+    state_max = 4096
+    cmd_capacity = 2
+    cursor = _align(_safety_offset() + _SAFETY.size)
+    state_off = cursor
+    cursor = _align(cursor + _SLOT_HDR.size + state_max)
+    cmd_off = cursor
+    cursor = _align(cursor + _CMD_HDR.size + cmd_capacity * (_SLOT_HDR.size + CMD_SLOT_MAX))
+    status_off = cursor
+    cursor = _align(cursor + _SLOT_HDR.size + STATUS_MAX)
+    created = _open_shared_memory(shm_name, create=True, size=cursor)
+    try:
+        _HEADER.pack_into(created.buf, 0, MAGIC, 2, os.getpid(), 1, cmd_capacity, 0)
+        _DIR.pack_into(
+            created.buf,
+            _HEADER.size,
+            b"left_arm",
+            state_max,
+            CMD_SLOT_MAX,
+            STATUS_MAX,
+            state_off,
+            cmd_off,
+            status_off,
+        )
+        payload = packb({"timestamp_ns": 5, "data": {"joint": [0.2]}}, use_bin_type=True)
+        created.buf[state_off + _SLOT_HDR.size : state_off + _SLOT_HDR.size + len(payload)] = payload
+        _SLOT_HDR.pack_into(created.buf, state_off, 1, len(payload), 0)
+    finally:
+        created.close()
+    bus = Bus.attach(shm_name)
+    try:
+        assert bus.version == 2
+        assert bus.read_state("left_arm")["data"]["joint"] == [0.2]
+        assert bus.read_control() == {"held": False, "role": "", "label": ""}
+        assert bus.read_stream("left_arm") is None
+        with pytest.raises(LayoutMismatchError, match="cyr restart"):
+            bus.write_stream("left_arm", {"joint": [0.3]})
+        with pytest.raises(LayoutMismatchError, match="cyr restart"):
+            bus.acquire_control("teleop")
+        assert bus.read_state("left_arm")["data"]["joint"] == [0.2]
+        assert bus.write_cmd("left_arm", {"joint": [0.4]}) == 1
+    finally:
+        bus.unlink()
+
+
 def test_dead_owner_is_replaced(monkeypatch):
     shm = _name()
     bus = Bus.create(shm, _slots(), cmd_capacity=2, owner_pid=999999)

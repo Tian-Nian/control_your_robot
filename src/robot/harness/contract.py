@@ -66,6 +66,8 @@ def _component_payload(name: str, payload: Mapping) -> dict:
         command["joint"] = _vector(payload["joint"], HAND_DOF if name.endswith("_hand") else None)
     if "eef" in payload:
         command["eef"] = _vector(payload["eef"], EEF_DIM)
+    if "gripper" in payload:
+        command["gripper"] = float(np.asarray(payload["gripper"], dtype=float).reshape(-1)[0])
     if "control_mode" in payload:
         command["control_mode"] = payload["control_mode"]
     if not command:
