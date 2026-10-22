@@ -14,7 +14,7 @@ Pipeline 版在 [`../handeye_charuco`](../handeye_charuco)。**本目录是另�
 ```bash
 cd /path/to/niantian/handeye_charuco_roma
 
-# 无真机测试（Xone / 带 opencv 的解释器）
+# 无真机测试（Robot / 带 opencv 的解释器）
 PYTHONPATH="$PWD:$PWD/../handeye_charuco" python -m pytest tests -q
 
 # 真机采集：conda roma（有 bus_py）+ opencv-python
