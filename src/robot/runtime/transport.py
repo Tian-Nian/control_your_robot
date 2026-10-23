@@ -69,6 +69,8 @@ def pid_alive(pid: int) -> bool:
     """进程还在跑才算活着。已经退出、尚未被父进程回收的僵尸不算。"""
     if pid <= 0:
         return False
+    if not os.path.isdir("/proc"):
+        return _pid_alive_without_proc(pid)
     try:
         with open(f"/proc/{pid}/stat", encoding="utf-8") as handle:
             stat = handle.read()
@@ -80,6 +82,23 @@ def pid_alive(pid: int) -> bool:
     if end < 0 or end + 2 >= len(stat):
         return True
     return stat[end + 2] != "Z"
+
+
+def _pid_alive_without_proc(pid: int) -> bool:
+    """macOS 没有 /proc。用信号判断进程是否存在，再用 ps 排除僵尸。"""
+    if not _pid_alive_by_signal(pid):
+        return False
+    import subprocess
+
+    try:
+        stat = subprocess.check_output(
+            ["ps", "-o", "stat=", "-p", str(pid)],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return _pid_alive_by_signal(pid)
+    return not stat.startswith("Z")
 
 
 def _pid_alive_by_signal(pid: int) -> bool:
@@ -127,12 +146,21 @@ class _Component:
     stream_max: int
 
 
+def _shm_dir() -> str:
+    """锁文件目录。Linux 用 /dev/shm；macOS 没有这个目录，放到临时目录。"""
+    if os.path.isdir("/dev/shm"):
+        return "/dev/shm"
+    path = os.path.join(os.environ.get("TMPDIR") or "/tmp", "cyr-shm")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
 def _lock_path(shm_name: str, component: str) -> str:
-    return f"/dev/shm/{shm_name}.{component}.lock"
+    return os.path.join(_shm_dir(), f"{shm_name}.{component}.lock")
 
 
 def _shm_fs_path(shm_name: str) -> str:
-    return f"/dev/shm/{shm_name.lstrip('/')}"
+    return os.path.join(_shm_dir(), shm_name.lstrip("/"))
 
 
 class _Locks:
@@ -631,10 +659,15 @@ def _release_stale(shm_name: str) -> None:
     stale = _open_shared_memory(shm_name, create=False)
     _destroy_segment(stale)
     stale.close()
-    for path in os.listdir("/dev/shm"):
+    root = _shm_dir()
+    try:
+        names = os.listdir(root)
+    except FileNotFoundError:
+        return
+    for path in names:
         prefix = f"{shm_name}."
         if path.startswith(prefix) and path.endswith(".lock"):
             try:
-                os.unlink(f"/dev/shm/{path}")
+                os.unlink(os.path.join(root, path))
             except FileNotFoundError:
                 pass

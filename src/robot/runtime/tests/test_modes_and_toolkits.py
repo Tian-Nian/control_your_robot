@@ -156,6 +156,36 @@ def test_piper_sim_position_teleports_and_mit_integrates():
     assert float(arm.get_state()["joint"][1]) > float(current[1]) + 0.01
 
 
+def test_piper_sim_impedance_follows_a_pose_instead_of_jumping():
+    pytest.importorskip("pinocchio")
+    pytest.importorskip("rerun")
+    from robot.controller.PiperSim_controller import PiperSimController
+
+    arm = PiperSimController("left", spawn=False, INFO="ERROR")
+    arm.set_up(control_mode="impedance", tool_in_urdf=True)
+    start = arm.get_state()["joint"].copy()
+    goal = start.copy()
+    goal[1] -= 0.5
+    goal[2] += 0.4
+    arm.set_joint(goal)
+    assert np.allclose(arm.get_state()["joint"], start, atol=1e-6)
+    for _ in range(100):
+        arm.servo_step(0.02)
+        assert arm.fault == ""
+    tracked = arm.get_state()["joint"]
+    assert float(np.max(np.abs(goal - tracked))) < 0.05
+
+    parked = tracked.copy()
+    pose = arm.get_state()["eef"].copy()
+    pose[0] += 0.02
+    arm.set_position(pose)
+    assert np.allclose(arm.get_state()["joint"], parked, atol=1e-6)
+    for _ in range(40):
+        arm.servo_step(0.02)
+        assert arm.fault == ""
+    assert float(np.linalg.norm(arm.get_state()["joint"] - parked)) > 0.01
+
+
 def test_gravity_and_impedance_checks_ask_until_the_mode_is_up():
     gravity = _load("gravity_check", ROOT / "toolkits" / "gravity_compensation" / "check.py")
     impedance = _load("impedance_check", ROOT / "toolkits" / "impedance" / "check.py")

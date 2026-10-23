@@ -20,6 +20,8 @@ GRIPPER_JOINTS = ("joint7", "joint8")
 READY_JOINT = np.array([0.0, 1.3, -1.0, 0.0, 0.5, 0.0])
 _DEFAULT_JOINT_K = np.array([16.0, 16.0, 16.0, 8.0, 8.0, 8.0])
 _DEFAULT_JOINT_D = np.array([1.8, 1.8, 1.8, 1.8, 1.8, 1.8])
+# 弹簧一次只看这么大的误差。更远的目标留在 _q_des，电机逐拍拉过去。
+_SERVO_ERROR_LIMIT = 0.2
 
 
 class SimProtection(RuntimeError):
@@ -195,11 +197,18 @@ class PiperSimController(ArmController):
             self._q_des = self.q[:6].copy()
         if self.control_mode == "gravity_compensation":
             return self.gravity_compensation()
+        q_des = self._servo_setpoint()
         if self.control_mode == "impedance":
-            return self.joint_impedance_torque(self._q_des, self._joint_K, self._joint_D)["torque"]
+            return self.joint_impedance_torque(q_des, self._joint_K, self._joint_D)["torque"]
         if self.control_mode == "mit":
-            return self.mit_torque(self._q_des, self._kp, self._kd, self._qd_des, self._tau_ff)["torque"]
+            return self.mit_torque(q_des, self._kp, self._kd, self._qd_des, self._tau_ff)["torque"]
         return None
+
+    def _servo_setpoint(self):
+        """最终目标在 _q_des。这一拍弹簧只追附近的一点，避免一次 call 把关节写过去或超速停住。"""
+        goal = np.asarray(self._q_des, dtype=float).reshape(6)
+        current = self.q[:6]
+        return current + np.clip(goal - current, -_SERVO_ERROR_LIMIT, _SERVO_ERROR_LIMIT)
 
     def set_position(self, position):
         self._require_model()
@@ -211,7 +220,12 @@ class PiperSimController(ArmController):
         else:
             debug_print(self.name, "set_position input size should be 6 -> EULER or 7 -> QUATERNION", "ERROR")
             return
-        self._ik(rotation, position[:3])
+        servo = self.control_mode in ("impedance", "mit")
+        solved = self._ik(rotation, position[:3], commit=not servo)
+        if not servo or solved is None:
+            return
+        self._q_des = np.clip(solved, self._lower[:6], self._upper[:6])
+        self.fault = ""
 
     def set_gripper(self, gripper):
         self._require_model()
@@ -453,11 +467,13 @@ class PiperSimController(ArmController):
             self._publish()
         return self.q[:6].copy()
 
-    def _ik(self, rotation, translation, iterations=40):
+    def _ik(self, rotation, translation, iterations=40, commit=True):
         import pinocchio as pin
 
         target = np.asarray(translation, dtype=float).reshape(3)
         desired = np.asarray(rotation, dtype=float).reshape(3, 3)
+        saved_q = None if commit else self.q.copy()
+        saved_qd = None if commit else self.qd.copy()
         for _ in range(iterations):
             self._refresh()
             current = self.data.oMf[self._flange_id]
@@ -465,10 +481,16 @@ class PiperSimController(ArmController):
             error_rotation = pin.log3(desired @ current.rotation.T)
             error = np.concatenate([error_position, error_rotation])
             if float(np.linalg.norm(error)) < 1e-4:
-                self.qd[:] = 0.0
-                self.fault = ""
-                self._publish()
-                return
+                solved = self.q[:6].copy()
+                if commit:
+                    self.qd[:] = 0.0
+                    self.fault = ""
+                    self._publish()
+                else:
+                    self.q = saved_q
+                    self.qd = saved_qd
+                    self._refresh()
+                return solved
             jacobian = pin.computeFrameJacobian(
                 self.model,
                 self.data,
@@ -479,6 +501,10 @@ class PiperSimController(ArmController):
             step = jacobian.T @ np.linalg.solve(jacobian @ jacobian.T + 1e-4 * np.eye(6), error)
             self.q[:6] = self.q[:6] + step
             self._clip_joints()
+        if not commit:
+            self.q = saved_q
+            self.qd = saved_qd
+            self._refresh()
         self._refresh()
         current = self.data.oMf[self._flange_id]
         position_error = float(np.linalg.norm(target - current.translation))
@@ -534,7 +560,13 @@ class PiperSimController(ArmController):
         import sys
 
         _attach_desktop()
-        if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+        # macOS 的 Rerun 是原生窗口，不走 X11 / Wayland。
+        has_display = (
+            sys.platform == "darwin"
+            or os.environ.get("DISPLAY")
+            or os.environ.get("WAYLAND_DISPLAY")
+        )
+        if not has_display:
             debug_print(self.name, "当前没有显示器，Rerun 窗口没有打开。在图形终端里重新 cyr start", "WARNING")
             return
         viewer = Path(sys.executable).with_name("rerun")
