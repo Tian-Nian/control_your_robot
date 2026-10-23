@@ -115,7 +115,7 @@ class PiperSimController(ArmController):
         self.tool_offset = flange.rotation.T @ (tool.translation - flange.translation)
         self._start_viewer()
         self._publish()
-        debug_print(self.name, f"piper sim ready urdf={self.urdf_path}", self.INFO)
+        debug_print(self.name, f"piper sim ready urdf={self.urdf_path}", "INFO")
         if self.record_path:
             debug_print(self.name, f"rerun 录到 {self.record_path}", self.INFO)
 
@@ -542,6 +542,8 @@ class PiperSimController(ArmController):
             self._rr.log(f"tf/{self.name}/{name}", joint.compute_transform(float(self.q[index])))
 
     def _start_viewer(self):
+        if not self.spawn and not self.record_path:
+            return
         import rerun as rr
 
         rr.init(f"piper_sim_{self.name}", spawn=False)
