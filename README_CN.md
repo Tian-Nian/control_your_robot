@@ -310,3 +310,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest src/robot/runtime/tests src/ro
 | `third_party/` | 厂商库 |
 | `agent.md` | 给编码代理的说明 |
 | `developer_README.md` | 为什么旧的 `my_robot/` 目录仍留在 `main` |
+
+## 反馈验证 Harness
+
+新增 `PositionExecutor`：绝对关节/夹爪技能、观测新鲜度与持续误差验证、请求去重、顺序任务、取消请求和 JSONL 证据记录。默认示例自行启动独立 Piper Sim：`python examples/piper_harness.py`，可加 `--viewer`。输入、结果状态和能力边界见 [Harness 使用说明](docs/harness.md)。

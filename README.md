@@ -319,3 +319,7 @@ The Marvin URDF and `pinocchio` tests skip when those are absent.
 </p>
 
 If the WeChat group has expired, add the personal account to join.
+
+## Verified position harness
+
+Run `python examples/piper_harness.py` for an isolated Piper Sim task with fresh-feedback verification, request deduplication and a JSONL event journal. Add `--viewer` for a separate Rerun window. See [the harness guide](docs/harness.md) for prerequisites, API and interruption semantics.

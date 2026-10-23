@@ -2,6 +2,7 @@ import json
 import os
 import threading
 import time
+import uuid
 from pathlib import Path
 
 import numpy as np
@@ -180,7 +181,7 @@ def _run(shm, spec, arm):
 
 
 def test_one_command_per_tick_and_bundle_reports_hz():
-    shm = f"cyr_tick_{time.time_ns()}"
+    shm = f"cyr_tick_{uuid.uuid4().hex[:10]}"
     bus = Bus.create(shm, [SlotSpec("arm", 65536)], cmd_capacity=8)
     arm = _JointArm()
     arm.move_times = []
@@ -219,7 +220,7 @@ def test_one_command_per_tick_and_bundle_reports_hz():
         thread.join(timeout=2)
         bus.unlink()
 
-    shm = f"cyr_hz_{time.time_ns()}"
+    shm = f"cyr_hz_{uuid.uuid4().hex[:10]}"
     bus = Bus.create(shm, [SlotSpec("arm", 65536)], cmd_capacity=4)
     bundle_spec = {
         "name": "arm",
@@ -249,7 +250,7 @@ def test_one_command_per_tick_and_bundle_reports_hz():
 
 
 def test_gate_rejection_holds_component_without_latching_service(tmp_path):
-    shm = f"cyr_gate_{time.time_ns()}"
+    shm = f"cyr_gate_{uuid.uuid4().hex[:10]}"
     bus = Bus.create(shm, [SlotSpec("arm", 65536)], cmd_capacity=4)
     config = tmp_path / "gate.yml"
     config.write_text(
@@ -300,7 +301,7 @@ components:
 
 
 def test_motion_interpolates_and_tracking_timeout_holds():
-    shm = f"cyr_motion_{time.time_ns()}"
+    shm = f"cyr_motion_{uuid.uuid4().hex[:10]}"
     bus = Bus.create(shm, [SlotSpec("arm", 65536)], cmd_capacity=4)
     arm = _JointArm()
     spec = {
@@ -322,7 +323,7 @@ def test_motion_interpolates_and_tracking_timeout_holds():
         thread.join(timeout=2)
         bus.unlink()
 
-    shm = f"cyr_timeout_{time.time_ns()}"
+    shm = f"cyr_timeout_{uuid.uuid4().hex[:10]}"
     bus = Bus.create(shm, [SlotSpec("arm", 65536)], cmd_capacity=4)
 
     class Stuck(_JointArm):
@@ -366,7 +367,7 @@ def test_motion_interpolates_and_tracking_timeout_holds():
 
 
 def test_rejected_command_keeps_mode_and_service(tmp_path):
-    shm = f"cyr_mode_{time.time_ns()}"
+    shm = f"cyr_mode_{uuid.uuid4().hex[:10]}"
     bus = Bus.create(shm, [SlotSpec("arm", 65536)], cmd_capacity=4)
     config = tmp_path / "mode.yml"
     config.write_text(
@@ -427,7 +428,7 @@ components:
 
 
 def test_harness_step_records_action(tmp_path):
-    shm = f"cyr_ep_{time.time_ns()}"
+    shm = f"cyr_ep_{uuid.uuid4().hex[:10]}"
     bus = Bus.create(shm, [SlotSpec("left_arm", 65536), SlotSpec("left_hand", 65536)], cmd_capacity=4)
     config = tmp_path / "episode.yml"
     config.write_text(
@@ -540,6 +541,11 @@ def test_marvin_body_home_palm_clearance_and_ik():
     path = Path(__file__).resolve().parents[4] / "config" / "bodies" / "marvin.yml"
     if not path.is_file():
         pytest.skip("没有天机身体描述")
+    import yaml
+    config = yaml.safe_load(path.read_text())
+    urdf = (path.parent / config["urdf"]).resolve()
+    if not urdf.is_file():
+        pytest.skip(f"optional Marvin URDF is unavailable: {urdf}")
     from robot.harness.body import BodyModel
 
     body = BodyModel.load(path)
@@ -573,6 +579,11 @@ def test_bad_eef_and_stand_collision_hold_without_latch(tmp_path):
     path = Path(__file__).resolve().parents[4] / "config" / "bodies" / "marvin.yml"
     if not path.is_file():
         pytest.skip("没有天机身体描述")
+    import yaml
+    config = yaml.safe_load(path.read_text())
+    urdf = (path.parent / config["urdf"]).resolve()
+    if not urdf.is_file():
+        pytest.skip(f"optional Marvin URDF is unavailable: {urdf}")
     from robot.harness.body import BodyModel
 
     body = BodyModel.load(path)
@@ -605,7 +616,7 @@ def test_bad_eef_and_stand_collision_hold_without_latch(tmp_path):
             self.moves += 1
             self.joint = np.asarray(data["joint"], dtype=float)
 
-    shm = f"cyr_body_{time.time_ns()}"
+    shm = f"cyr_body_{uuid.uuid4().hex[:10]}"
     bus = Bus.create(shm, [SlotSpec("right_arm", 65536)], cmd_capacity=4)
     config = tmp_path / "body.yml"
     config.write_text(

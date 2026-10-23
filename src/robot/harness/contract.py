@@ -38,7 +38,7 @@ class ActionContract:
             raise ValueError("mode 只能是 joint 或 eef")
         self.mode = mode
         self.control_hz = float(control_hz)
-        if self.control_hz <= 0:
+        if not np.isfinite(self.control_hz) or self.control_hz <= 0:
             raise ValueError("control_hz 必须为正")
 
     @property
@@ -67,7 +67,7 @@ def _component_payload(name: str, payload: Mapping) -> dict:
     if "eef" in payload:
         command["eef"] = _vector(payload["eef"], EEF_DIM)
     if "gripper" in payload:
-        command["gripper"] = float(np.asarray(payload["gripper"], dtype=float).reshape(-1)[0])
+        command["gripper"] = _vector(payload["gripper"], 1)[0]
     if "control_mode" in payload:
         command["control_mode"] = payload["control_mode"]
     if not command:
@@ -103,6 +103,8 @@ def _fill_hand(commands: dict[str, dict], action: Mapping, side: str) -> None:
 
 def _vector(value, size: int | None = None) -> list[float]:
     vector = np.asarray(value, dtype=float).reshape(-1)
+    if not vector.size or not np.isfinite(vector).all():
+        raise ValueError("动作必须包含有限数值")
     if size is not None and vector.size != size:
         raise ValueError(f"长度应为 {size}，得到 {vector.size}")
     return [float(item) for item in vector]

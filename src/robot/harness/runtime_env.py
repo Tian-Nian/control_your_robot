@@ -47,6 +47,8 @@ class RuntimeEnv:
         }
 
     def take_action(self, action) -> dict:
+        if self.is_episode_end():
+            raise RuntimeError("episode 已结束，不再接受动作")
         if not self.lease.alive:
             raise RuntimeError("部署控制锁已过期")
         commands = self.contract.commands(_contract_action(action))
@@ -121,6 +123,9 @@ def _contract_action(action) -> dict:
         arm["gripper"] = gripper
         if joint_key in out and "joint" not in arm:
             arm["joint"] = out[joint_key]
+        pose_key = f"{side}_ee_pose"
+        if pose_key in out and "eef" not in arm:
+            arm["eef"] = out[pose_key]
         out[arm_name] = arm
     return out
 
