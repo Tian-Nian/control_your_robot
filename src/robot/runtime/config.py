@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,6 +24,7 @@ _COMPONENT_KEYS = {
     "body",
     "gate",
     "motion",
+    "stream_timeout_s",
 }
 
 
@@ -39,6 +41,7 @@ class ComponentConfig:
     body: str = ""
     gate: dict | None = None
     motion: dict | None = None
+    stream_timeout_s: float = 0.0
 
     def as_spec(self) -> dict:
         return {
@@ -53,6 +56,7 @@ class ComponentConfig:
             "body": self.body,
             "gate": dict(self.gate or {}),
             "motion": dict(self.motion or {}),
+            "stream_timeout_s": self.stream_timeout_s,
         }
 
 
@@ -124,6 +128,9 @@ def _component(path: Path, raw: object) -> ComponentConfig:
         if not candidate.is_absolute():
             candidate = (path.parent / candidate).resolve()
         body_path = str(candidate)
+    stream_timeout = float(raw.get("stream_timeout_s", 0))
+    if not math.isfinite(stream_timeout) or stream_timeout < 0:
+        raise ValueError("stream_timeout_s must be finite and nonnegative")
     return ComponentConfig(
         name=name,
         class_path=_require_str(raw, "class_path"),
@@ -136,6 +143,7 @@ def _component(path: Path, raw: object) -> ComponentConfig:
         body=body_path,
         gate=_mapping(raw.get("gate"), f"{name}.gate"),
         motion=_mapping(raw.get("motion"), f"{name}.motion"),
+        stream_timeout_s=stream_timeout,
     )
 
 

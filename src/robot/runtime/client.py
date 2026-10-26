@@ -19,8 +19,8 @@ class RuntimeClient:
     def write_cmd(self, name: str, data: dict, is_delta: bool = False, token: int = 0) -> int:
         return self._bus.write_cmd(name, data, is_delta=is_delta, token=token)
 
-    def write_stream(self, name: str, data: dict, token: int = 0) -> int:
-        return self._bus.write_stream(name, data, token=token)
+    def write_stream(self, name: str, data: dict, token: int = 0, valid_for_s: float | None = None) -> int:
+        return self._bus.write_stream(name, data, token=token, valid_for_s=valid_for_s)
 
     def read_control(self) -> dict:
         return self._bus.read_control()

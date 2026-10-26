@@ -1,0 +1,61 @@
+{
+  "source": "TianxingChen/RoboTwin2.0: objects/002_bowl model_id=3; local RoboTwin asset copy",
+  "collision_pieces": 24,
+  "bowl_scale": [
+    0.05,
+    0.05,
+    0.05
+  ],
+  "bowl_mass_kg": 0.08,
+  "robot_collision": "one convex hull per visual link, approximate; robot self-collision disabled",
+  "sources": {
+    "assets/sim/piper/piper_single.urdf": "9e8672cd87a89b55415039c3033fd7bc75ea01da23d577597b7971db13c7bf05",
+    "objects/002_bowl/visual/base3.glb": "f99e9609f59b3a560dc3bef52551fb9346d291aaeea13e65e2af3f034029712b",
+    "objects/002_bowl/collision/base3.glb": "d52b74783637f4f86a40bc53d49c61e40464ee3d32279252b4a335414e82e9a4",
+    "objects/002_bowl/model_data3.json": "ee29eeaff742b3595be18e9d21752a988f6c11b5cc0e9d9e262969d98745f28b",
+    "embodiments/piper/piper.urdf": "fa27856fc91f085877c4d022790372fe8d38f27000e7bc0c8bd091cc986c02c2",
+    "embodiments/piper/config.yml": "9eaacf85af9b99c5cf4d907f84087d628644afd5d9f52a6c65f7ef94e3a500b9",
+    "assets/sim/piper/meshes/base_link.dae": "3c9a5f47db03dfbaa75fc2a98135bd5c7d0e3661c2a601b7372bd04e3cfdb689",
+    "assets/sim/piper/meshes/link1.dae": "2bb0e08b05a4de1a1c3f073c59dde29335ba3cec9a020e0a09735108c0420b28",
+    "assets/sim/piper/meshes/link2.dae": "64e70cd8927b3f4d23f056f978e3f1004ca8d6f6a01843ef6a5e08075be2c6f3",
+    "assets/sim/piper/meshes/link3.dae": "c3f3f592868362852da55bdfc6fdbbfeef653bb8e226721dbdd448161f298d04",
+    "assets/sim/piper/meshes/link4.dae": "d74c2f686f8e42e0b71044afa29f2726cddfb346f4e2d92f8566489be5882a14",
+    "assets/sim/piper/meshes/link5.dae": "cb463d5e034adb780fea4a0b7d716d1b3b1de1535c728d747a3370bc347f95e2",
+    "assets/sim/piper/meshes/link6.dae": "95fe3065b36e8e0a513c92b7d40d96630ce7ea1ed6628de9605f862dad38a80a",
+    "assets/sim/piper/meshes/link7.dae": "7534447abb248829c447a8e19d84c6fb3903ab70ebc32dfd164abcc4099fc74a",
+    "assets/sim/piper/meshes/link8.dae": "662d36ce7edf3e1cbb887302f4499a76aff75ccf1996730fa63f2a30f749adda",
+    "embodiments/piper/meshes/camera_link.glb": "9a757c71f6cd6076f630970e4cb9da71e82c88a9043309eadee05ee52287070f",
+    "embodiments/piper/meshes/camera.glb": "9833e436988bcd83f3113ab1071428427c80d6a1392d9e0b7cf35d2b6e949d7c"
+  },
+  "cameras": {
+    "wrist_parent": "camera",
+    "wrist_chain": [
+      "link6_to_camera_mount",
+      "camera_joint"
+    ],
+    "source_axes": "SAPIEN FLU",
+    "renderer_axes": "OpenGL RUB",
+    "observation_axes": "OpenCV RDF",
+    "fovy_degrees": 37,
+    "source_camera_profile": "RoboTwin D435 320x240",
+    "head_pose": "RoboTwin static_camera_list transformed by inverse robot_pose",
+    "camera_visuals": "original origins; camera mesh simplified to 20000 faces; massless, non-colliding"
+  },
+  "initial_bowl_positions_m": [
+    [
+      0.42,
+      -0.12,
+      0.08
+    ],
+    [
+      0.46,
+      0.18,
+      0.08
+    ],
+    [
+      0.25,
+      0.23,
+      0.08
+    ]
+  ]
+}

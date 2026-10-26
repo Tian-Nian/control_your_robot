@@ -1,0 +1,204 @@
+<mujoco model="piper_three_bowls">
+  <compiler angle="radian" eulerseq="XYZ" meshdir="meshes" autolimits="true" />
+  <option timestep="0.002" integrator="implicitfast" cone="elliptic" iterations="80" />
+  <visual>
+    <global offwidth="640" offheight="480" />
+  </visual>
+  <asset>
+    <mesh name="base_link" file="base_link.stl" />
+    <mesh name="link1" file="link1.stl" />
+    <mesh name="link2" file="link2.stl" />
+    <mesh name="link3" file="link3.stl" />
+    <mesh name="link4" file="link4.stl" />
+    <mesh name="link5" file="link5.stl" />
+    <mesh name="link6" file="link6.stl" />
+    <mesh name="link7" file="link7.stl" />
+    <mesh name="link8" file="link8.stl" />
+    <mesh name="camera_mount" file="camera_mount.stl" />
+    <mesh name="camera" file="camera.stl" />
+    <mesh name="bowl_visual" file="bowl_visual.stl" />
+    <mesh name="bowl_collision_0" file="bowl_collision_0.stl" />
+    <mesh name="bowl_collision_1" file="bowl_collision_1.stl" />
+    <mesh name="bowl_collision_2" file="bowl_collision_2.stl" />
+    <mesh name="bowl_collision_3" file="bowl_collision_3.stl" />
+    <mesh name="bowl_collision_4" file="bowl_collision_4.stl" />
+    <mesh name="bowl_collision_5" file="bowl_collision_5.stl" />
+    <mesh name="bowl_collision_6" file="bowl_collision_6.stl" />
+    <mesh name="bowl_collision_7" file="bowl_collision_7.stl" />
+    <mesh name="bowl_collision_8" file="bowl_collision_8.stl" />
+    <mesh name="bowl_collision_9" file="bowl_collision_9.stl" />
+    <mesh name="bowl_collision_10" file="bowl_collision_10.stl" />
+    <mesh name="bowl_collision_11" file="bowl_collision_11.stl" />
+    <mesh name="bowl_collision_12" file="bowl_collision_12.stl" />
+    <mesh name="bowl_collision_13" file="bowl_collision_13.stl" />
+    <mesh name="bowl_collision_14" file="bowl_collision_14.stl" />
+    <mesh name="bowl_collision_15" file="bowl_collision_15.stl" />
+    <mesh name="bowl_collision_16" file="bowl_collision_16.stl" />
+    <mesh name="bowl_collision_17" file="bowl_collision_17.stl" />
+    <mesh name="bowl_collision_18" file="bowl_collision_18.stl" />
+    <mesh name="bowl_collision_19" file="bowl_collision_19.stl" />
+    <mesh name="bowl_collision_20" file="bowl_collision_20.stl" />
+    <mesh name="bowl_collision_21" file="bowl_collision_21.stl" />
+    <mesh name="bowl_collision_22" file="bowl_collision_22.stl" />
+    <mesh name="bowl_collision_23" file="bowl_collision_23.stl" />
+  </asset>
+  <worldbody>
+    <light pos="0 0 2" dir="0 0 -1" diffuse="0.8 0.8 0.8" />
+    <geom name="table" type="box" pos="0.35 0 -0.025" size="0.65 0.55 0.025" rgba="0.65 0.65 0.65 1" contype="2" conaffinity="3" friction="0.8 0.01 0.001" />
+    <camera name="head" pos="0 0.032 0.6" xyaxes="-0 -1 -0 0.8 -0 0.6" fovy="37" />
+    <body name="base_link">
+      <inertial pos="-0.00979274765955341 1.82905827587138E-06 0.0410100126360189" mass="0.162548567403693" fullinertia="0.0002265969245 0.0002694447726 0.0002223182589 -7.339722702e-08 2.132499778e-06 8.151690096e-09" />
+      <geom name="robot_base_link" type="mesh" mesh="base_link" rgba="0.2 0.23 0.26 1" pos="0 0 0" euler="0 0 0" contype="1" conaffinity="2" mass="0" friction="1.2 0.01 0.001" condim="4" />
+      <body name="link1" pos="0 0 0.123" euler="0 0 -1.5708">
+        <inertial pos="0.00131676031927024 0.000310288842008612 -0.00922874512303437" mass="0.0978679932242825" fullinertia="7.766845583e-05 9.249677802e-05 8.245890624e-05 1.090846505e-07 -1.974805324e-06 9.912846468e-07" />
+        <joint name="joint1" type="hinge" axis="0 0 1" range="-2.618 2.618" damping="0.2" armature="0.01" />
+        <geom name="robot_link1" type="mesh" mesh="link1" rgba="0.2 0.23 0.26 1" pos="0 0 0" euler="0 0 0" contype="1" conaffinity="2" mass="0" friction="1.2 0.01 0.001" condim="4" />
+        <body name="link2" pos="0 0 0" euler="1.5708 0 -1.5708">
+          <inertial pos="0.148793602378802 -0.00242026983944119 0.00175154638467948" mass="0.290888938633388" fullinertia="0.0001489596402 0.001728009466 0.001775462834 -7.377503844e-05 -9.686884052e-07 -1.096922256e-06" />
+          <joint name="joint2" type="hinge" axis="0 0 1" range="0 3.14" damping="0.2" armature="0.01" />
+          <geom name="robot_link2" type="mesh" mesh="link2" rgba="0.2 0.23 0.26 1" pos="0 0 0" euler="0 0 0" contype="1" conaffinity="2" mass="0" friction="1.2 0.01 0.001" condim="4" />
+          <body name="link3" pos="0.28358 0.028726 0" euler="0 0 0.10095">
+            <inertial pos="-0.0996835215213704 0.0349477226691318 0.000508025815507312" mass="0.290847697793211" fullinertia="0.0001078790116 0.0002147516718 0.0002419234393 2.926695212e-05 6.825922326e-07 -7.784690479e-07" />
+            <joint name="joint3" type="hinge" axis="0 0 1" range="-2.697 2.697" damping="0.2" armature="0.01" />
+            <geom name="robot_link3" type="mesh" mesh="link3" rgba="0.2 0.23 0.26 1" pos="0 0 0" euler="0 0 0" contype="1" conaffinity="2" mass="0" friction="1.2 0.01 0.001" condim="4" />
+            <body name="link4" pos="-0.24221 0.068514 0" euler="-1.5708 0 1.3826">
+              <inertial pos="0.000276464622387979 -0.00102803669324875 -0.00472830700561663" mass="0.127087348341362" fullinertia="3.820117304e-05 4.870485552e-05 4.105920776e-05 -4.923583509e-08 4.89589433e-08 6.708029425e-08" />
+              <joint name="joint4" type="hinge" axis="0 0 1" range="-1.832 1.832" damping="0.2" armature="0.01" />
+              <geom name="robot_link4" type="mesh" mesh="link4" rgba="0.2 0.23 0.26 1" pos="0 0 0" euler="0 0 0" contype="1" conaffinity="2" mass="0" friction="1.2 0.01 0.001" condim="4" />
+              <body name="link5" pos="0 0 0" euler="1.5708 0 0">
+                <inertial pos="8.82262433516967E-05 0.0566829014808256 -0.00196119720482461" mass="0.144711242639457" fullinertia="4.396443137e-05 5.63173921e-05 4.887136647e-05 -3.592596864e-08 -1.897477414e-08 -2.154071669e-07" />
+                <joint name="joint5" type="hinge" axis="0 0 1" range="-1.22 1.22" damping="0.2" armature="0.01" />
+                <geom name="robot_link5" type="mesh" mesh="link5" rgba="0.2 0.23 0.26 1" pos="0 0 0" euler="0 0 0" contype="1" conaffinity="2" mass="0" friction="1.2 0.01 0.001" condim="4" />
+                <body name="link6" pos="0 0.091 0.0014165" euler="-1.5708 -3.1415926 0">
+                  <inertial pos="0.00103120214523473 0.0121761387587524 0.0315480874960164" mass="0.195187143240719" fullinertia="6.437902565e-05 0.0001261463964 0.0001540870768 -1.236616616e-06 1.976646063e-07 2.411570785e-06" />
+                  <joint name="joint6" type="hinge" axis="0 0 1" range="-3.14 3.14" damping="0.2" armature="0.01" />
+                  <geom name="robot_link6" type="mesh" mesh="link6" rgba="0.2 0.23 0.26 1" pos="0 0 0" euler="0 0 1.5708" contype="1" conaffinity="2" mass="0" friction="1.2 0.01 0.001" condim="4" />
+                  <body name="link7" pos="0 0 0.13503" euler="1.5708 0 3.1415926">
+                    <inertial pos="-0.000277778383727112 -0.0467673043650824 -0.00921029491873201" mass="0.02648229234527" fullinertia="9.997874799e-06 6.179521229e-06 1.421027172e-05 -1.575484951e-07 -2.71342775e-08 -1.589398036e-06" />
+                    <joint name="joint7" type="slide" axis="0 0 -1" range="0 0.04" damping="1" armature="0.001" />
+                    <geom name="robot_link7" type="mesh" mesh="link7" rgba="0.2 0.23 0.26 1" pos="0 0 0" euler="0 0 0" contype="1" conaffinity="2" mass="0" friction="1.2 0.01 0.001" condim="4" />
+                  </body>
+                  <body name="link8" pos="0 0 0.13503" euler="-1.5708 0 3.1415926">
+                    <inertial pos="0.000277816920932317 0.0467673824063769 -0.00921030054508036" mass="0.0264822021416248" fullinertia="9.997791194e-06 6.179524416e-06 1.421019275e-05 -1.575422834e-07 2.713674467e-08 1.589393195e-06" />
+                    <joint name="joint8" type="slide" axis="0 0 -1" range="0 0.04" damping="1" armature="0.001" />
+                    <geom name="robot_link8" type="mesh" mesh="link8" rgba="0.2 0.23 0.26 1" pos="0 0 0" euler="0 0 0" contype="1" conaffinity="2" mass="0" friction="1.2 0.01 0.001" condim="4" />
+                  </body>
+                  <body name="flange" pos="0 0 0" euler="0 0 0">
+                    <site name="flange" size="0.002" rgba="0 0 0 0" />
+                    <body name="tool" pos="0 0 0.13503" euler="0 0 0">
+                      <site name="tool" size="0.002" rgba="0 0 0 0" />
+                    </body>
+                  </body>
+                  <body name="camera_mount" pos="0 0 -0.077" euler="0 0 1.5708">
+                    <geom name="robot_camera_mount" type="mesh" mesh="camera_mount" rgba="0.2 0.23 0.26 1" pos="0 0 0.08" euler="0 0 0" contype="0" conaffinity="0" mass="0" friction="1.2 0.01 0.001" condim="4" />
+                    <body name="camera" pos="0.032 0.055 0.115" euler="0 -1.1116926535897932 -1.5707963267948966">
+                      <geom name="robot_camera" type="mesh" mesh="camera" rgba="0.2 0.23 0.26 1" pos="0.0015 -0.0315 -0.00" euler="0.1 0 -1.5707963267948966" contype="0" conaffinity="0" mass="0" friction="1.2 0.01 0.001" condim="4" />
+                      <camera name="wrist" pos="0 0 0" xyaxes="0 -1 0 0 0 1" fovy="37" />
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+    <body name="bowl_0" pos="0.42 -0.12 0.08" quat="0.5 0.5 0.5 0.5">
+      <freejoint name="bowl_0_free" />
+      <inertial pos="0 0.025 0" mass="0.08" diaginertia="0.00015 0.00025 0.00015" />
+      <geom name="bowl_0_visual" type="mesh" mesh="bowl_visual" contype="0" conaffinity="0" group="1" rgba="0.85 0.3 0.2 1" />
+      <geom name="bowl_0_collision_0" type="mesh" mesh="bowl_collision_0" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_1" type="mesh" mesh="bowl_collision_1" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_2" type="mesh" mesh="bowl_collision_2" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_3" type="mesh" mesh="bowl_collision_3" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_4" type="mesh" mesh="bowl_collision_4" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_5" type="mesh" mesh="bowl_collision_5" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_6" type="mesh" mesh="bowl_collision_6" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_7" type="mesh" mesh="bowl_collision_7" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_8" type="mesh" mesh="bowl_collision_8" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_9" type="mesh" mesh="bowl_collision_9" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_10" type="mesh" mesh="bowl_collision_10" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_11" type="mesh" mesh="bowl_collision_11" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_12" type="mesh" mesh="bowl_collision_12" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_13" type="mesh" mesh="bowl_collision_13" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_14" type="mesh" mesh="bowl_collision_14" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_15" type="mesh" mesh="bowl_collision_15" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_16" type="mesh" mesh="bowl_collision_16" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_17" type="mesh" mesh="bowl_collision_17" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_18" type="mesh" mesh="bowl_collision_18" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_19" type="mesh" mesh="bowl_collision_19" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_20" type="mesh" mesh="bowl_collision_20" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_21" type="mesh" mesh="bowl_collision_21" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_22" type="mesh" mesh="bowl_collision_22" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_0_collision_23" type="mesh" mesh="bowl_collision_23" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+    </body>
+    <body name="bowl_1" pos="0.46 0.18 0.08" quat="0.5 0.5 0.5 0.5">
+      <freejoint name="bowl_1_free" />
+      <inertial pos="0 0.025 0" mass="0.08" diaginertia="0.00015 0.00025 0.00015" />
+      <geom name="bowl_1_visual" type="mesh" mesh="bowl_visual" contype="0" conaffinity="0" group="1" rgba="0.2 0.6 0.85 1" />
+      <geom name="bowl_1_collision_0" type="mesh" mesh="bowl_collision_0" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_1" type="mesh" mesh="bowl_collision_1" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_2" type="mesh" mesh="bowl_collision_2" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_3" type="mesh" mesh="bowl_collision_3" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_4" type="mesh" mesh="bowl_collision_4" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_5" type="mesh" mesh="bowl_collision_5" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_6" type="mesh" mesh="bowl_collision_6" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_7" type="mesh" mesh="bowl_collision_7" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_8" type="mesh" mesh="bowl_collision_8" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_9" type="mesh" mesh="bowl_collision_9" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_10" type="mesh" mesh="bowl_collision_10" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_11" type="mesh" mesh="bowl_collision_11" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_12" type="mesh" mesh="bowl_collision_12" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_13" type="mesh" mesh="bowl_collision_13" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_14" type="mesh" mesh="bowl_collision_14" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_15" type="mesh" mesh="bowl_collision_15" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_16" type="mesh" mesh="bowl_collision_16" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_17" type="mesh" mesh="bowl_collision_17" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_18" type="mesh" mesh="bowl_collision_18" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_19" type="mesh" mesh="bowl_collision_19" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_20" type="mesh" mesh="bowl_collision_20" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_21" type="mesh" mesh="bowl_collision_21" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_22" type="mesh" mesh="bowl_collision_22" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_1_collision_23" type="mesh" mesh="bowl_collision_23" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+    </body>
+    <body name="bowl_2" pos="0.25 0.23 0.08" quat="0.5 0.5 0.5 0.5">
+      <freejoint name="bowl_2_free" />
+      <inertial pos="0 0.025 0" mass="0.08" diaginertia="0.00015 0.00025 0.00015" />
+      <geom name="bowl_2_visual" type="mesh" mesh="bowl_visual" contype="0" conaffinity="0" group="1" rgba="0.3 0.75 0.35 1" />
+      <geom name="bowl_2_collision_0" type="mesh" mesh="bowl_collision_0" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_1" type="mesh" mesh="bowl_collision_1" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_2" type="mesh" mesh="bowl_collision_2" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_3" type="mesh" mesh="bowl_collision_3" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_4" type="mesh" mesh="bowl_collision_4" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_5" type="mesh" mesh="bowl_collision_5" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_6" type="mesh" mesh="bowl_collision_6" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_7" type="mesh" mesh="bowl_collision_7" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_8" type="mesh" mesh="bowl_collision_8" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_9" type="mesh" mesh="bowl_collision_9" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_10" type="mesh" mesh="bowl_collision_10" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_11" type="mesh" mesh="bowl_collision_11" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_12" type="mesh" mesh="bowl_collision_12" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_13" type="mesh" mesh="bowl_collision_13" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_14" type="mesh" mesh="bowl_collision_14" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_15" type="mesh" mesh="bowl_collision_15" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_16" type="mesh" mesh="bowl_collision_16" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_17" type="mesh" mesh="bowl_collision_17" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_18" type="mesh" mesh="bowl_collision_18" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_19" type="mesh" mesh="bowl_collision_19" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_20" type="mesh" mesh="bowl_collision_20" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_21" type="mesh" mesh="bowl_collision_21" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_22" type="mesh" mesh="bowl_collision_22" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+      <geom name="bowl_2_collision_23" type="mesh" mesh="bowl_collision_23" contype="2" conaffinity="3" group="3" rgba="0 0 0 0" friction="1 0.01 0.001" condim="4" />
+    </body>
+  </worldbody>
+  <actuator>
+    <position name="joint1" joint="joint1" kp="300" kv="20" ctrlrange="-2.618 2.618" forcerange="-60 60" />
+    <position name="joint2" joint="joint2" kp="300" kv="20" ctrlrange="0 3.14" forcerange="-60 60" />
+    <position name="joint3" joint="joint3" kp="300" kv="20" ctrlrange="-2.697 2.697" forcerange="-60 60" />
+    <position name="joint4" joint="joint4" kp="300" kv="20" ctrlrange="-1.832 1.832" forcerange="-60 60" />
+    <position name="joint5" joint="joint5" kp="300" kv="20" ctrlrange="-1.22 1.22" forcerange="-60 60" />
+    <position name="joint6" joint="joint6" kp="300" kv="20" ctrlrange="-3.14 3.14" forcerange="-60 60" />
+    <position name="joint7" joint="joint7" kp="500" kv="5" ctrlrange="0 0.04" forcerange="-10 10" />
+    <position name="joint8" joint="joint8" kp="500" kv="5" ctrlrange="0 0.04" forcerange="-10 10" />
+  </actuator>
+</mujoco>

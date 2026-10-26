@@ -25,6 +25,8 @@ dependencies = [
 
 [project.optional-dependencies]
 sim = ["rerun-sdk"]
+harness-mujoco = ["mujoco>=3.3,<4", "rerun-sdk"]
+harness-assets = ["trimesh>=4,<6", "pycollada>=0.8", "fast-simplification>=0.1"]
 
 [project.urls]
 Repository = "https://github.com/Tian-Nian/control_your_robot"

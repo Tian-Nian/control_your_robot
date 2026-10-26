@@ -304,6 +304,10 @@ def _init_runtime_state(component, spec: dict) -> None:
     component._cyr_motion_timeout_s = float((spec.get("motion") or {}).get("timeout_s") or 0.0)
     component._cyr_stream_seq = 0
     component._cyr_stream_target = None
+    component._cyr_stream_deadline_ns = 0
+    component._cyr_stream_state = "idle"
+    component._cyr_stream_reason = ""
+    component._cyr_stream_hold = False
     component._cyr_cycles = deque()
 
 
@@ -336,10 +340,14 @@ def _motion_status(component) -> dict:
         "motion_seq": 0 if plan is None else int(plan.seq),
         "motion_timeout_s": float(getattr(component, "_cyr_motion_timeout_s", 0.0) or 0.0),
         "tracking_err": float(getattr(component, "_cyr_tracking_err", 0.0) or 0.0),
+        "stream_seq": int(getattr(component, "_cyr_stream_seq", 0)),
+        "stream_state": getattr(component, "_cyr_stream_state", "idle"),
+        "stream_reason": getattr(component, "_cyr_stream_reason", ""),
     }
 
 
 def _advance(bus: Bus, spec: dict, component, log) -> None:
+    _stream_watchdog(bus, spec, component)
     if getattr(component, "_cyr_motion", None) is not None:
         _step_motion(component)
         return
@@ -371,6 +379,10 @@ def _apply_command(spec: dict, component, command: dict) -> None:
     if not isinstance(data, dict):
         raise CommandRejected("命令必须是对象")
     if data.get("op") == "release":
+        component._cyr_stream_hold = False
+        component._cyr_stream_state = "idle"
+        component._cyr_stream_target = None
+        component._cyr_stream_reset_seq = component._cyr_stream_seq
         component._cyr_motion_hold = False
         component._cyr_last_cmd_error = ""
         return
@@ -617,24 +629,73 @@ def _arm_name(spec: dict) -> str:
     return name
 
 
+def _stop_stream(component, reason):
+    component._cyr_motion = None
+    component._cyr_motion_hold = True
+    component._cyr_stream_hold = True
+    component._cyr_stream_target = None
+    component._cyr_stream_deadline_ns = 0
+    component._cyr_stream_reason = reason
+    component._cyr_last_cmd_error = "" if reason == "stop requested" else reason
+    state = component.get_state() if callable(getattr(component, "get_state", None)) else {}
+    if state.get("control_mode") == "position" and state.get("joint") is not None:
+        payload = {"joint": np.asarray(state["joint"], dtype=float).tolist()}
+        if state.get("gripper") is not None:
+            payload["gripper"] = float(np.asarray(state["gripper"]).reshape(-1)[0])
+        component.move(payload, is_delta=False)
+        component._cyr_stream_state = "stopped"
+    else:
+        engage_safe_stop(component)
+        component._cyr_stream_state = "stop_unconfirmed"
+
+
+def _stream_watchdog(bus, spec, component):
+    """Runs in the device process before motion/stream advancement.
+
+    Deadlines use the host monotonic clock. No Python loop can enforce them
+    while the driver itself blocks. Position hold is not a hardware e-stop.
+    """
+    held = bus.read_control()["held"]
+    frame = bus.read_stream(spec["name"]) if held else None
+    if frame is not None and int(frame["seq"]) != component._cyr_stream_seq:
+        component._cyr_stream_seq = int(frame["seq"])
+        if frame["data"].get("op") == "stop":
+            _stop_stream(component, "stop requested")
+            return
+        if not component._cyr_stream_hold:
+            component._cyr_stream_target = frame["data"]
+            deadline = int(frame.get("deadline_ns", 0))
+            cap = float(spec.get("stream_timeout_s") or 0)
+            if cap > 0:
+                written = int(frame.get("written_ns", 0))
+                configured = written + int(cap * 1e9) if written > 0 else 1
+                deadline = min(deadline, configured) if deadline else configured
+            component._cyr_stream_deadline_ns = deadline
+            component._cyr_stream_state = "active"
+            component._cyr_stream_reason = ""
+    if component._cyr_stream_state == "active":
+        if not held:
+            if component._cyr_stream_deadline_ns:
+                _stop_stream(component, "control lease lost")
+            else:
+                component._cyr_stream_state = "idle"
+                component._cyr_stream_target = None
+        elif component._cyr_stream_deadline_ns and time.monotonic_ns() >= component._cyr_stream_deadline_ns:
+            _stop_stream(component, "stream target expired")
+
+
 def _follow_stream(bus: Bus, spec: dict, component) -> None:
-    """每拍朝最新目标走一步。步长超限就削短，不拒绝，也不锁住组件。"""
-    if getattr(component, "_cyr_motion_hold", False):
+    if component._cyr_motion_hold or component._cyr_stream_hold:
         return
     if not bus.read_control()["held"]:
         return
     frame = bus.read_stream(spec["name"])
     if frame is None:
         return
-    seq = int(frame["seq"])
-    if seq == int(getattr(component, "_cyr_stream_reset_seq", 0) or 0):
+    if int(frame["seq"]) == int(getattr(component, "_cyr_stream_reset_seq", 0) or 0):
         component._cyr_stream_target = None
-        component._cyr_stream_seq = seq
         return
-    if seq != int(getattr(component, "_cyr_stream_seq", 0) or 0):
-        component._cyr_stream_target = frame["data"]
-        component._cyr_stream_seq = seq
-    target = getattr(component, "_cyr_stream_target", None)
+    target = component._cyr_stream_target
     if not isinstance(target, dict):
         return
     try:
@@ -642,13 +703,9 @@ def _follow_stream(bus: Bus, spec: dict, component) -> None:
     except CommandRejected as exc:
         component._cyr_last_cmd_error = str(exc)
         return
-    if not payload:
-        return
-    move = getattr(component, "move", None)
-    if move is None:
-        return
-    move(payload, is_delta=False)
-    component._cyr_last_cmd_error = ""
+    if payload:
+        component.move(payload, is_delta=False)
+        component._cyr_last_cmd_error = ""
 
 
 def _stream_payload(spec: dict, component, target: dict) -> dict:
@@ -749,6 +806,9 @@ def _status(
     motion_seq: int = 0,
     motion_timeout_s: float = 0.0,
     tracking_err: float = 0.0,
+    stream_seq: int = 0,
+    stream_state: str = "idle",
+    stream_reason: str = "",
 ) -> None:
     bus.write_status(
         name,
@@ -768,5 +828,8 @@ def _status(
             "motion_seq": int(motion_seq),
             "motion_timeout_s": float(motion_timeout_s),
             "tracking_err": float(tracking_err),
+            "stream_seq": stream_seq,
+            "stream_state": stream_state,
+            "stream_reason": stream_reason,
         },
     )

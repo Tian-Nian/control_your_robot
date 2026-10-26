@@ -1,0 +1,4 @@
+# Optional development checks, including the legacy RGB/JPEG runtime contract.
+-r harness-vision.txt
+pytest
+opencv-python

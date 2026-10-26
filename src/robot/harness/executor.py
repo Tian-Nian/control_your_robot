@@ -59,6 +59,7 @@ class PositionExecutor:
         self._cache = {}
         self._closed = False
         self._poisoned = False
+        self._stopped = False
         self.lease = None
         # Fail before acquiring control or opening a log when prerequisites fail.
         self._read()
@@ -67,9 +68,9 @@ class PositionExecutor:
         self._log = path.open("x", encoding="utf-8")
         try:
             self.lease = ControlLease(session, "model", 2.0)
-            # Replace any prior target; this is an explicit position-mode hold.
-            initial = self._read()
-            self._hold(initial)
+            # A previous executor can leave the runtime stop latch engaged.
+            # Verify a fresh stop, then explicitly release it on the first action.
+            initial = self._stop_and_confirm()
             self._emit("opened", feedback=initial)
         except BaseException:
             if self.lease is not None:
@@ -112,10 +113,10 @@ class PositionExecutor:
         return {"seq": int(frame["seq"]), "timestamp_ns": stamp,
                 "joint": q.tolist(), "gripper": grip}
 
-    def _write(self, payload):
+    def _write(self, payload, valid_for_s=None):
         if not self.lease.alive:
             raise RuntimeError("control lease lost")
-        result = self.session.write_target(self.component, payload)
+        result = self.session.write_target(self.component, payload, valid_for_s=valid_for_s)
         self._emit("write", target=payload, receipt={k: result.get(k) for k in ("accepted", "seq", "error")})
         if not result.get("accepted") or result.get("error"):
             raise RuntimeError(result.get("error") or "target rejected")
@@ -170,6 +171,7 @@ class PositionExecutor:
                   "status": "unknown", "reason": "interrupted", "target": target}
         attempted = False
         try:
+            self._resume_verified_hold()
             before = self._read()
             goal = {"joint": target.get("joint", before["joint"]),
                     "gripper": target.get("gripper", before["gripper"])}
@@ -180,7 +182,7 @@ class PositionExecutor:
                 raise RuntimeError("cancel requested before write")
             deadline = time.monotonic() + timeout_s
             attempted = True  # A transport exception can leave an uncertain write.
-            self._write(goal)
+            self._write(goal, valid_for_s=timeout_s)
             last_seq, last_stamp = before["seq"], before["timestamp_ns"]
             in_band_since = None
             while True:
@@ -206,7 +208,12 @@ class PositionExecutor:
                         if in_band_since is None:
                             in_band_since = now
                         if now - in_band_since >= dwell_s:
-                            result.update(status="succeeded", reason="fresh position feedback verified", feedback=feedback)
+                            stop_feedback = self._stop_and_confirm()
+                            if (np.max(np.abs(np.asarray(stop_feedback["joint"]) - goal["joint"])) > tolerance_rad
+                                    or abs(stop_feedback["gripper"] - goal["gripper"]) > gripper_tolerance):
+                                raise RuntimeError("goal tolerance lost during stop verification")
+                            result.update(status="succeeded", reason="fresh position feedback verified", feedback=feedback,
+                                          stop_confirmed=True, stop_feedback=stop_feedback)
                             break
                     else:
                         in_band_since = None
@@ -214,14 +221,13 @@ class PositionExecutor:
         except Exception as exc:
             result["reason"] = str(exc)
             if attempted:
-                # Never claim cancelled/failed implies confirmed physical stop.
                 try:
-                    feedback = self._read()
-                    self._hold(feedback)
-                    result["hold_requested"] = True
-                except Exception as hold_error:
-                    result["hold_error"] = str(hold_error)
-                result["status"] = "unknown"
+                    result["stop_feedback"] = self._stop_and_confirm()
+                    result["stop_confirmed"] = True
+                    result["status"] = "cancelled" if self._cancel.is_set() else "failed"
+                except Exception as stop_error:
+                    result["stop_error"] = str(stop_error)
+                    result["status"] = "unknown"
                 self._poisoned = True
             else:
                 result["status"] = "rejected"
@@ -235,6 +241,80 @@ class PositionExecutor:
                 finally:
                     self._active = None
         return deepcopy(result)
+
+    def observe(self):
+        """Fresh robot feedback, not a policy summary or inferred object state."""
+        feedback = self._read()
+        return {**feedback, "observation_id": f"{self.component}:{feedback['seq']}:{feedback['timestamp_ns']}",
+                "component": self.component, "frame_id": "base", "joint_unit": "rad",
+                "age_ms": (time.time_ns() - feedback["timestamp_ns"]) / 1e6}
+
+    def get_status(self):
+        with self._mutex:
+            return {"active_request": self._active, "requires_recovery": self._poisoned,
+                    "closed": self._closed, "lease_alive": bool(self.lease and self.lease.alive),
+                    "runtime": self.session.runtime_status(self.component)}
+
+    def _stop_and_confirm(self, timeout_s=1.0):
+        if not self.lease.alive:
+            raise RuntimeError("control lease lost; cannot request stop")
+        before = self._read()
+        receipt = self.session.stop_target(self.component)
+        if not receipt.get("accepted") or receipt.get("error"):
+            raise RuntimeError("stop request rejected")
+        self._emit("stop_requested", receipt={k: receipt.get(k) for k in ("accepted", "seq", "error")})
+        deadline = time.monotonic() + timeout_s
+        previous = None
+        stable_since = None
+        while time.monotonic() < deadline:
+            if not self.lease.alive:
+                raise RuntimeError("control lease lost during stop verification")
+            status = self.session.runtime_status(self.component) or {}
+            feedback = self._read()
+            if status.get("stream_seq") == receipt["seq"] and status.get("stream_state") == "stopped":
+                if feedback["seq"] > before["seq"] and feedback["timestamp_ns"] > before["timestamp_ns"]:
+                    if (feedback["timestamp_ns"] - before["timestamp_ns"]) / 1e6 > self.max_age_ms:
+                        stable_since = None
+                        previous = None
+                    if previous is not None:
+                        drift = np.max(np.abs(np.asarray(feedback["joint"]) - previous["joint"]))
+                        grip_drift = abs(feedback["gripper"] - previous["gripper"])
+                        if drift <= 1e-4 and grip_drift <= 1e-4:
+                            if stable_since is None:
+                                stable_since = time.monotonic()
+                            if time.monotonic() - stable_since >= 0.05:
+                                self._stopped = True
+                                self._emit("stop_confirmed", feedback=feedback)
+                                return feedback
+                        else:
+                            stable_since = None
+                            previous = feedback
+                    if previous is None:
+                        previous = feedback
+                    before = feedback
+            time.sleep(self.poll_s)
+        raise RuntimeError("position stop could not be verified")
+
+    def _resume_verified_hold(self):
+        if self._stopped:
+            result = self.session.call(self.component, {"op": "release"})
+            if not result.get("accepted") or result.get("error"):
+                raise RuntimeError("runtime release failed")
+            self._stopped = False
+
+    def recover(self):
+        """Explicit recovery: fresh position hold, verify, then release latch.
+
+        Old request IDs retain their original outcomes. No automatic retry.
+        """
+        with self._mutex:
+            if self._active is not None or self._closed:
+                raise RuntimeError("cannot recover a busy or closed executor")
+            feedback = self._stop_and_confirm()
+            self._resume_verified_hold()
+            self._poisoned = False
+            self._emit("recovered", feedback=feedback)
+            return {"status": "ready", "feedback": feedback}
 
     def cancel(self, request_id):
         """Request interruption, not a physical emergency stop."""
@@ -262,7 +342,7 @@ class PositionExecutor:
                 raise RuntimeError("cancel active request and wait before close")
             self._closed = True
             try:
-                self._hold(self._read())
+                self._stop_and_confirm()
             finally:
                 try:
                     self.lease.close()

@@ -91,7 +91,7 @@ class Session:
             return _result(False, None, str(exc), None)
         return self._wait(name, seq, timeout)
 
-    def write_target(self, name: str, data: dict, token: int | None = None) -> dict:
+    def write_target(self, name: str, data: dict, token: int | None = None, *, valid_for_s: float | None = None) -> dict:
         """写下最新目标。成功只表示已经盖住上一份，不表示臂已经走到。"""
         spec = self._spec(name)
         if spec is None:
@@ -100,7 +100,7 @@ class Session:
             return _result(False, None, "组件不接受命令", self._state(name))
         writer = self._token if token is None else int(token)
         try:
-            seq = self._client.write_stream(name, data, token=writer)
+            seq = self._client.write_stream(name, data, token=writer, valid_for_s=valid_for_s)
         except ControlBusyError as exc:
             _warn_busy(name, exc)
             return _result(False, None, str(exc), self._state(name))
@@ -109,6 +109,14 @@ class Session:
         except (KeyError, ValueError) as exc:
             return _result(False, None, str(exc), self._state(name))
         return _result(True, seq, "", self._state(name))
+
+    def runtime_status(self, name: str) -> dict | None:
+        """Raw runtime telemetry; callers must also check feedback freshness."""
+        return self._client.read_status(name)
+
+    def stop_target(self, name: str) -> dict:
+        """Request position hold via the stream slot, even during a motion plan."""
+        return self.write_target(name, {"op": "stop"})
 
     def reset(self, name: str, start_state=None, timeout: float = 15.0) -> dict:
         payload = {"op": "reset"}

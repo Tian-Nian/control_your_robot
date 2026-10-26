@@ -1,0 +1,9 @@
+# Explicit opt-in, minimal simulation-only environment; no physical camera SDK.
+# Install the checkout afterwards with: pip install --no-deps -e .
+numpy
+scipy
+h5py
+pyyaml
+msgpack>=1.0.5
+mujoco>=3.3,<4
+rerun-sdk

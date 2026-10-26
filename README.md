@@ -323,3 +323,11 @@ If the WeChat group has expired, add the personal account to join.
 ## Verified position harness
 
 Run `python examples/piper_harness.py` for an isolated Piper Sim task with fresh-feedback verification, request deduplication and a JSONL event journal. Add `--viewer` for a separate Rerun window. See [the harness guide](docs/harness.md) for prerequisites, API and interruption semantics.
+
+For opt-in physical contact and RGB-agent experiments, install the dedicated
+`requirements/harness-vision.txt` environment, then use
+`bash examples/piper_mujoco.sh start` and `bash examples/piper_mujoco.sh agent`.
+The [same guide](docs/harness.md#optional-mujoco-contact-and-visual-agent-guide)
+covers model configuration, observation boundaries, XYZ/rotation control,
+verified recovery and Enter-to-stop behavior. MuJoCo is not a default dependency;
+fixed physical grasp tests pass, while autonomous visual grasping remains unvalidated.

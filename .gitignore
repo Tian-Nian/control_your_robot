@@ -37,3 +37,8 @@ policy/DP/checkpoints/*
 eval_results/
 # Verified harness episode journals
 /save/harness_*.jsonl
+# Optional isolated contact-simulation environment
+.venv-harness/
+
+# MuJoCo native graphics diagnostics
+/MUJOCO_LOG.TXT

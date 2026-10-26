@@ -39,18 +39,50 @@ class Session:
         self.released = True
         return True
 
-    def write_target(self, name, payload):
+    def write_target(self, name, payload, **kwargs):
         self.writes.append(payload)
         if not self.stuck:
             self.q = payload["joint"]
             self.gripper = [payload["gripper"]]
         return dict(accepted=True, seq=len(self.writes), error="")
 
+    def stop_target(self, name):
+        self.stop_seq = len(self.writes) + 100
+        return dict(accepted=True, seq=self.stop_seq, error="")
+
+    def runtime_status(self, name):
+        return dict(stream_seq=getattr(self, "stop_seq", 0), stream_state="stopped")
+
+    def call(self, name, payload):
+        return dict(accepted=True, error="")
+
 
 def make(tmp_path, session=None, **kw):
     session = session or Session()
     return PositionExecutor(session, lower=[-1, -1], upper=[1, 1],
                             journal=tmp_path / "events.jsonl", poll_s=.002, **kw)
+
+
+def test_new_executor_releases_previously_stopped_runtime(tmp_path):
+    class LatchedSession(Session):
+        latched = True
+        def write_target(self, name, payload, **kwargs):
+            if self.latched:
+                return dict(accepted=True, seq=1, error="")
+            return super().write_target(name, payload, **kwargs)
+        def stop_target(self, name):
+            self.latched = True
+            return super().stop_target(name)
+        def call(self, name, payload):
+            if payload == {"op": "release"}:
+                self.latched = False
+            return super().call(name, payload)
+    session = LatchedSession()
+    for i in range(2):
+        with PositionExecutor(session, lower=[-1, -1], upper=[1, 1],
+                              journal=tmp_path / f"run{i}.jsonl", poll_s=.002) as executor:
+            assert executor.execute(f"move{i}", joint=[.1 * (i+1), 0], dwell_s=.01)["status"] == "succeeded"
+        assert session.latched
 
 
 def test_verified_sequence_journal_and_dedup(tmp_path):
@@ -102,8 +134,8 @@ def test_timeout_stops_task_sequence(tmp_path):
         results = runner.run([dict(request_id="stuck", joint=[.5, .5], timeout_s=.03, dwell_s=.01),
                               dict(request_id="must-not-run", joint=[0, 0])])
         assert len(results) == 1
-        assert results[0]["status"] == "unknown"
-        assert results[0]["hold_requested"]
+        assert results[0]["status"] == "failed"
+        assert results[0]["stop_confirmed"]
         assert "timeout" in results[0]["reason"]
 
 
@@ -123,7 +155,7 @@ def test_cancel_and_concurrent_request(tmp_path):
         finally:
             thread.join(timeout=2)
         assert not thread.is_alive()
-        assert results[0]["status"] == "unknown"
+        assert results[0]["status"] == "cancelled"
         assert "cancel" in results[0]["reason"]
 
 

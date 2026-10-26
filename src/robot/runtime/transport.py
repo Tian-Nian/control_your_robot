@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import math
 import secrets
 import struct
 import time
@@ -444,12 +445,19 @@ class Bus:
         body = unpackb(blob, raw=False)
         return {"seq": seq, "is_delta": bool(body["is_delta"]), "data": body["data"]}
 
-    def write_stream(self, name: str, data: dict, token: int = 0) -> int:
+    def write_stream(self, name: str, data: dict, token: int = 0, valid_for_s: float | None = None) -> int:
         """盖住这份最新目标。不进命令环，调用方也不等它被执行。"""
         self._require_layout()
         self._check_writer(token)
         comp = self._require(name)
-        payload = packb({"data": data}, use_bin_type=True)
+        written_ns = time.monotonic_ns()
+        deadline_ns = 0
+        if valid_for_s is not None:
+            ttl = float(valid_for_s)
+            if not math.isfinite(ttl) or ttl <= 0:
+                raise ValueError("valid_for_s must be finite and positive")
+            deadline_ns = written_ns + int(ttl * 1e9)
+        payload = packb({"data": data, "written_ns": written_ns, "deadline_ns": deadline_ns}, use_bin_type=True)
         if len(payload) > comp.stream_max:
             raise ValueError(f"{name}: stream is {len(payload)} bytes, max is {comp.stream_max}")
         with self._locks.hold(name):
@@ -469,7 +477,9 @@ class Bus:
                 return None
             blob = bytes(self._shm.buf[comp.stream_off + _SLOT_HDR.size : comp.stream_off + _SLOT_HDR.size + nbytes])
         body = unpackb(blob, raw=False)
-        return {"seq": int(seq), "data": body["data"]}
+        return {"seq": int(seq), "data": body["data"],
+                "written_ns": int(body.get("written_ns", 0)),
+                "deadline_ns": int(body.get("deadline_ns", 0))}
 
     def cmd_cursors(self, name: str) -> tuple[int, int, int]:
         comp = self._require(name)
