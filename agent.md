@@ -138,3 +138,5 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest src/robot/runtime/tests src/ro
 ```
 
 Do not use a Python that auto-loads ROS pytest plugins.
+
+MuJoCo exception: without a body adapter, the runtime uses the device’s local `solve_ik` for full flange position AND orientation. With motion tracking enabled, its `runtime_reset_target` is interpolated without blocking physics. These are distinct from the older body position-only IK and controller-specific reset implementations.

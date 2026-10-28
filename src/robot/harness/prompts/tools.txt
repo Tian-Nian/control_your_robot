@@ -1,0 +1,22 @@
+ACTION PROTOCOL
+Return one of:
+{"action":"move","direction":"forward|back|left|right|up|down","step_cm":3,"reason":"..."}
+{"action":"rotate","sense":"down|cw|ccw","reason":"..."}
+{"action":"tool_move","direction":"x+|x-|y+|y-|z+|z-","step_cm":3,"reason":"..."}
+{"action":"tool_rotate","axis":"x|y|z","sign":1 or -1,"reason":"..."}
+{"action":"joint_step","joint_index":1 through 6,"sign":1 or -1,"reason":"..."}
+{"action":"set_gripper","gripper":0 or 1,"reason":"..."}
+{"action":"point","camera":"head|wrist","pixel":[u,v],"reason":"..."}
+{"action":"replan","reason":"..."}
+{"action":"wait","reason":"..."}
+{"action":"done","reason":"..."}
+
+
+Tool semantics:
+- move is in base axes: forward/back = +/-X, left/right = +/-Y, up/down = +/-Z. tool_move uses the CURRENT tool axes, before rotation: +Z approaches, -Z withdraws, Y is the finger opening axis and X the other transverse axis. Tool +Z is down only when the current tool points down. Use FK axes and wrist_tool_guide, never fixed screen/base equivalences.
+- move/tool_move step_cm is 1–5 cm, fractional allowed, default 1. Use 3–5 only on a visibly clear path, 2 for intermediate corrections and 1 near the object/table or uncertainty. Direction feasibility hints check only 1 cm. Full requests are preflighted into <=1 cm waypoints, each position-verified; failure abandons remaining segments. No image decision occurs within a long action and IK feasibility does not establish collision clearance.
+- tool_rotate is sign * 0.04 rad about current tool x/y/z, at fixed tool origin. rotate down reduces tilt toward vertical; cw/ccw turn about tool Z. joint_step changes one 1-based joint by sign * 0.04 rad and may translate/rotate the tool. Use visible clearance and robot-only recovery predictions when changing posture.
+- gripper 0 closes, 1 opens; successful width tracking never proves holding or release.
+- sensor_policy.single_camera_depth_point_allowed governs point. When false, single-camera point is rejected. Use RGB corrections; if needed, two-view point requires second={"camera":"other camera","pixel":[u,v]} for the SAME visible physical point. Do not fabricate correspondence. Single-camera depth needs explicit enablement and permission in the task.
+- A point uses the current captured RGB image and image_timestamps_ns, not a newer unseen frame. point_query is historical evidence, not a live motion target. image_age_ms_at_query was measured at queried_at_ns; it keeps aging. Do not use old pixels as a track.
+- wait obtains a new image without motion. replan requests bounded strategy revision. done requests an independent stage image check; it does not declare success.

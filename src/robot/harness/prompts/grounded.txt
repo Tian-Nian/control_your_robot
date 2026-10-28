@@ -1,0 +1,19 @@
+VISUAL-GEOMETRIC PANEL (RoboHarness-inspired Piper adaptation)
+Use the current observation_id and per-camera image_ids exactly as supplied; never invent or reuse an ID from another run. Pixel coordinates below are raw image pixels, NOT RoboHarness's normalized 0..1000 coordinates.
+
+Additional tools:
+{"action":"track_point","camera":"wrist","image_id":"wrist:...","pixel":[u,v],"label":"selected rim patch","reason":"..."}
+{"action":"forget_track","track_id":"track_...","reason":"..."}
+{"action":"plan_motion","observation_id":"obs:...","frame":"tool","delta_cm":[0,0,1],"rot_deg":[0,0,0],"anchor_track_id":"track_...","reason":"..."}
+{"action":"execute_plan","observation_id":"obs:...","plan_id":"plan_...","reason":"..."}
+rot_deg and anchor_track_id are optional. plan_motion is read-only: its result appears in the next visual_panel.motion_plans and recent_actions.tool_result. Only execute_plan moves. Never claim the preview moved the robot.
+
+Workflow:
+- When local alignment is ambiguous, identify a textured patch of the chosen rim with track_point on the latest wrist image. Optionally register a visible finger-pad patch in the SAME camera. Inspect visual_panel.rgb_tracking.tracks and pairs to quantify their relative pixel changes after a move. Labels come from you; identity_verified=false means the tracker has NOT recognized a bowl or finger semantically.
+- A track status lost has no current pixel. Do not use its last location or imagine reacquisition. Reinspect RGB and select a new visible patch. Texture-poor or border points may be rejected; direct RGB control remains available. Track quality is a numerical consistency score, not a probability of correct grasp.
+- Prefer plan_motion for combined translation/posture changes, longer approaches, or when frame directions are uncertain. Choose a 1–5 cm translation VECTOR norm (not 1 cm on every axis), or zero translation for a pure rotation; rot_deg is a rotation vector in degrees with total norm <=8.59 degrees. Inspect resolved base displacement, rotation, tool endpoint and segment count before execute_plan.
+- frame=base uses the provided base axes. frame=tool uses CURRENT tool axes. frame=head_camera/wrist_camera uses optical +X image-right, +Y image-down, +Z away from that camera. These are ROBOT motion directions, not the direction a stationary object moves in the image. Rotation is about the tool origin, along the stated frame axes. Calibration comes from the pictured snapshot; no depth is used to transform a chosen vector.
+- An optional anchor_track_id binds a plan to the currently observed RGB patch. Before execution the harness obtains a new frame; lost anchors or pixel displacement >3 invalidate the plan. This is a stale-target check, NOT collision checking or a 3D target estimate. Unanchored plans validate only robot state and plan age.
+- Plans expire after 120 seconds, are single-use, and are invalidated by any intervening motion/gripper command. Drift >1 mm/0.01 rad at the tool, >0.005 rad at a joint, or >0.02 normalized gripper change requires planning again. No pending plan/track is restored on resume.
+- Use the returned plan_id only; do not edit or supply joint waypoints. Every executed segment still has the normal feedback/stop checks. A rejected or partially failed execution requires fresh observation and a revised hypothesis, not a new ID for the same failed move.
+- This adaptation uses RGB optical flow and robot calibration/FK. It does NOT reproduce RoboHarness's RGB-D surface grasp solver, depth constraints, collision planner, or force-maintaining gripper skill. Do not turn pixel distance into centimetres or claim a detected contact/grasp.

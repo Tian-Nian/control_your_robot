@@ -22,8 +22,8 @@ def run_pick_check(session):
         return state
 
     initial = read()
-    if np.linalg.norm(np.asarray(initial["objects"]["bowl_0"]["pose"][:2]) - [.42, -.12]) > .01:
-        raise ValueError("fixed pick check requires initial bowl_0 at (0.42, -0.12); restart the scene")
+    if np.linalg.norm(np.asarray(initial["objects"]["bowl_0"]["pose"][:2]) - [.32, -.12]) > .01:
+        raise ValueError("fixed pick check requires initial bowl_0 at (0.32, -0.12); restart the scene")
     initial_z = float(initial["objects"]["bowl_0"]["pose"][2])
     solver = PiperMuJoCoController(cameras=False)
     solver.set_up()
@@ -68,13 +68,13 @@ def run_pick_check(session):
             return solver.solve_ik([*xyz, np.cos(half), 0., np.sin(half), 0.], "tool")
 
         phase("open", initial["joint"], 1., 1.)
-        phase("approach", ik([.42, -.04, .17], 145), 1., 3.)
-        grasp_q = ik([.42, -.04, .035], 180)
+        phase("approach", ik([.32, -.04, .17], 145), 1., 3.)
+        grasp_q = ik([.32, -.04, .035], 180)
         phase("descend", grasp_q, 1., 3.)
         grasped = phase("close", grasp_q, 0., 2.)
         if not grasp_evidence(grasped, "bowl_0", initial_z)["bilateral_contact"]:
             raise RuntimeError("closing did not produce bilateral bowl contact")
-        lift_q = ik([.42, -.04, .17], 145)
+        lift_q = ik([.32, -.04, .17], 145)
         lifted = phase("lift", lift_q, 0., 3.)
         if not grasp_evidence(lifted, "bowl_0", initial_z)["grasped_and_lifted"]:
             raise RuntimeError("bowl was not physically grasped and lifted")

@@ -1,0 +1,21 @@
+GRASP WORKFLOW
+The following is a conditional visual workflow, not an automatic motion sequence.
+
+Acquire and orient:
+- Use head RGB to locate the selected object and approach clearance, then prefer wrist RGB for the selected rim relative to the finger pads. Orient approximately downward at clearance. If exact vertical posture is IK-infeasible, inspect feasible directions and bounded joint/posture alternatives; do not repeatedly rotate at an unreachable location.
+- The far finger can remain occluded by the fixed wrist mount. Its absence alone does not require retreat. If the rim itself or closing path is ambiguous, reacquire a view with justified clearance. Do not require both fingertips to become visible.
+
+Align and approach:
+- Align ONE rim segment with the closing region, not the bowl center or image center. wrist_tool_guide is robot geometry only: tool_origin_pixel is not an object/contact point. A wrist-attached gripper stays nearly fixed in its own image. Tool axes in optical coordinates describe a direction hypothesis; compare actual rim-to-pad change after one motion before keeping/reversing direction. Do not infer centimetres from pixel gaps.
+- Open, roughly align tool X/Y, then approach tool +Z if its base direction and current images support it. Stop lateral polishing once the rim enters the closing path. Choose larger clear approaches and 1 cm near-object corrections.
+- Read scene_reference: tool height above table is tool_Z minus table_top_z_m. Use the supplied rough rim height and grasp-height reference to recognize an early high closure. These are not live bowl pose/depth/contact feedback and assume the declared resting geometry. Do not command the nominal reference blindly. The nominal tool origin is not the lowest finger/camera/arm point, so contact can occur at larger tool Z. Height never authorizes motion on its own.
+
+Close, inspect, probe:
+- Close once when enclosure is visually plausible. The harness requests an image check after an eligible close; consult task_progress.last_image_check on the next turn. A timeout and a successful close are both attempts, not contact proof.
+- If enclosure is visible, GRASP can complete without an already lifted bowl. LIFT still requires the same object to move with the gripper and visibly separate from support. If ambiguous and clearance permits, one small closed upward probe can add evidence. An independent image check follows eligible upward probes.
+- task_progress.grasp_attempts preserves up to four attempts across plans: close commands, ended_by_open, measured closed_translation_m/upward_travel_m, and image checks. These describe robot commands/motion only. ended_by_open records an open command, not proof of release. Repeating open-close at the same geometry is not a new grasp hypothesis.
+- When a probe leaves the bowl on its support, reopen and revise the approach based on fresh wrist evidence. If holding remains possible, do not open blindly. If several probes already accumulated height and the verifier still cites occlusion, plan a justified visibility change or replan; do not keep lifting solely to eliminate uncertainty.
+
+Recovery:
+- IK rejection is a robot constraint, not proof of an object blocking motion. Check all available base/tool directions and small joint predictions. A 1 cm feasible option is not collision clearance or proof of a longer path.
+- A false image check is a failure to establish the stage condition, not necessarily a failed grasp. Replan only when the stage premise or strategy needs changing; preserve a plausible held object while seeking evidence. Neither an automatic check nor a recovery decision opens, retreats or resets the robot on its own.

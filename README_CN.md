@@ -16,6 +16,32 @@ cyr stop
 
 没有硬件也能跑。`config/runtime/test_robot.yml` 用进程内的测试设备。`config/runtime/piper_sim.yml` 是 Piper 仿真，默认位置模式。重力和阻抗分别用 `piper_sim_gravity.yml`、`piper_sim_impedance.yml`。`config/runtime/marvin_lab.yml` 是天机实验台。
 
+## 可选 MuJoCo 与视觉 Agent（当前默认）
+
+基础 Piper Sim 继续用于教学；物理接触和视觉抓取通过独立 `.venv-harness` 环境启用，不默认安装 MuJoCo。
+
+```bash
+python3 -m venv .venv-harness
+source .venv-harness/bin/activate
+python -m pip install -r requirements/harness-vision.txt
+python -m pip install --no-deps -e .
+python examples/piper_mujoco_harness.py --pick-test
+bash examples/piper_mujoco.sh start
+bash examples/piper_mujoco.sh viewer
+# 先按指南配置图像模型 API，再启动：
+bash examples/piper_mujoco.sh agent
+```
+
+- 默认 `robowork`：单 agent、双视角 RGB-D、按需技能、工具系/基座系/相机系位姿规划与执行、关节控制。没有旧阶段和恢复次数预算，默认持续运行到 Enter、显式 finish 或运行故障。
+- 规划与执行分离，计划绑定当前状态且只执行一次；腕图用于局部夹持，头图用于整体运动。物体位姿和接触真值不进入模型输入。
+- 闭合命令跨动作和推理等待持续保持；默认每指 2 N 预紧，总执行器力不超过每指 10 N。闭合开度和驱动力不等于抓稳证据。
+- 同一设备支持 `cyr call` 关节绝对/增量、法兰位置与姿态、夹爪和 reset。单次目标分段执行并检查关节到位；reset 只回臂，restart 重建场景。
+- 独立只读 Rerun、断点续跑、离线报告、退出来源与故障审计。驱动/物理参数更新需 restart，不能只重启 agent。
+
+[完整安装、所有入口与参数、模型配置、工具说明、cyr call 和排错](docs/harness_robowork.md) · [PositionExecutor 与持久化技能 API](docs/harness.md) · [场景资产与生成](assets/sim/piper_mujoco/README.md)。旧分层架构仅 `--architecture layered` 显式启用。
+
+固定轨迹的物理夹取、15 秒持续夹持和释放已验证；尚未证明视觉 agent 能稳定自主抓碗或叠三碗。当前规划不具备完整场景碰撞检查。基础模式、采集、遥操作和部署用法见下文。
+
 ## 命令
 
 | 命令 | 作用 |
@@ -314,3 +340,5 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest src/robot/runtime/tests src/ro
 ## 反馈验证 Harness
 
 新增 `PositionExecutor`：绝对关节/夹爪技能、观测新鲜度与持续误差验证、请求去重、顺序任务、取消请求和 JSONL 证据记录。默认示例自行启动独立 Piper Sim：`python examples/piper_harness.py`，可加 `--viewer`。输入、结果状态和能力边界见 [Harness 使用说明](docs/harness.md)。
+
+MuJoCo 特例：没有 body 适配器时，runtime 使用设备本地 `solve_ik`，同时求解法兰位置和姿态；启用 motion 时通过 `runtime_reset_target` 非阻塞插值复位，物理仿真持续运行。不要套用上文旧 body 的仅位置 IK 或其他控制器的 reset 细节。

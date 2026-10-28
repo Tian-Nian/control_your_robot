@@ -39,11 +39,18 @@ class PiperMuJoCoController(ArmController):
     supported_modes = ("position",)
 
     def __init__(self, name="left_arm", scene_path=None, cameras=True, camera_hz=10,
-                 width=320, height=240, spawn=False, record_path=None):
+                 width=320, height=240, spawn=False, record_path=None, head_camera_profile="robotwin", gripper_preload_n=2.0):
         super().__init__()
         self.name = name
         self.DoFs = 6
         self.scene_path = scene_path
+        if head_camera_profile not in ("robotwin", "oblique"):
+            raise ValueError("head_camera_profile must be robotwin or oblique")
+        self.head_camera_profile = head_camera_profile
+        self.gripper_preload_n = float(gripper_preload_n)
+        if not math.isfinite(self.gripper_preload_n) or not 0 <= self.gripper_preload_n <= 10:
+            raise ValueError("gripper_preload_n must be finite in [0, 10] N per finger")
+        self._gripper_preload_active = False
         self.cameras_enabled = bool(cameras)
         self.camera_hz = float(camera_hz)
         self.width, self.height = int(width), int(height)
@@ -70,12 +77,25 @@ class PiperMuJoCoController(ArmController):
         self.set_control_mode(control_mode)
         path = Path(self.scene_path).resolve() if self.scene_path else default_scene()
         self.model = mujoco.MjModel.from_xml_path(str(path))
+        if self.head_camera_profile == "oblique":
+            cid = self.model.camera("head").id
+            if self.model.cam_bodyid[cid] != 0:
+                raise ValueError("oblique head profile requires a world-mounted camera")
+            eye, target = np.array([.75, -.65, .65]), np.array([.32, 0., .04])
+            back = eye - target; back /= np.linalg.norm(back)
+            right = np.cross([0., 0., 1.], back); right /= np.linalg.norm(right)
+            up = np.cross(back, right)
+            quat = Rotation.from_matrix(np.column_stack((right, up, back))).as_quat()
+            self.model.cam_pos[cid] = eye
+            self.model.cam_quat[cid] = quat[[3, 0, 1, 2]]
+            self.model.cam_fovy[cid] = 50.
         self.data = mujoco.MjData(self.model)
         self._joint_ids = np.array([self.model.joint(f"joint{i}").id for i in range(1, 9)])
         self._qadr = self.model.jnt_qposadr[self._joint_ids]
         self._vadr = self.model.jnt_dofadr[self._joint_ids]
         self._lower, self._upper = self.model.jnt_range[self._joint_ids, 0], self.model.jnt_range[self._joint_ids, 1]
         self._act = np.array([self.model.actuator(f"joint{i}").id for i in range(1, 9)])
+        self._gripper_bias0 = self.model.actuator_biasprm[self._act[6:], 0].copy()
         self._flange = self.model.site("flange").id
         self._tool = self.model.site("tool").id
         self.data.qpos[self._qadr[:6]] = READY_JOINT
@@ -112,6 +132,9 @@ class PiperMuJoCoController(ArmController):
                 "eef": pose(self.data.site_xpos[self._flange], self.data.site_xmat[self._flange]),
                 "gripper": np.array([np.clip(np.mean(self.data.qpos[self._qadr[6:]] / self._upper[6:]), 0., 1.)]),
                 "gripper_joint_m": self.data.qpos[self._qadr[6:]].copy(),
+                "gripper_command": float(np.mean(self._goal[6:] / self._upper[6:])),
+                "gripper_actuator_force_n": self.data.actuator_force[self._act[6:]].copy(),
+                "gripper_preload_n": self.gripper_preload_n if self._gripper_preload_active else 0.,
                 "control_mode": self.control_mode, "servo_fault": self.fault,
                 "objects": objects, "contacts": contacts, "cameras": self._cameras,
                 "sim_time": float(self.data.time)}
@@ -136,6 +159,16 @@ class PiperMuJoCoController(ArmController):
         if value.size != 1 or not np.isfinite(value).all() or not 0 <= value[0] <= 1:
             raise ValueError("gripper must be a scalar in [0,1]")
         self._goal[6:] = value[0] * self._upper[6:]
+        self._gripper_preload_active = bool(value[0] == 0 and not getattr(self, "_cyr_stream_hold", False)
+                                           and not getattr(self, "_cyr_safety_stopped", False))
+        # Offset the affine actuator force, not qfrc_applied: MuJoCo's existing
+        # actuator forcerange still limits the TOTAL spring+damping+preload force.
+        self.model.actuator_biasprm[self._act[6:], 0] = self._gripper_bias0 - (
+            self.gripper_preload_n if self._gripper_preload_active else 0.)
+
+    def runtime_reset_target(self, start_state=None):
+        """Arm-only reset target for nonblocking runtime trajectory tracking."""
+        return vector(READY_JOINT if start_state is None else start_state, 6)
 
     def apply_reset(self, start_state):
         """Set an arm-only home goal; physics continues in servo_step, objects remain."""
@@ -240,9 +273,22 @@ class PiperMuJoCoController(ArmController):
                 rr.log(path, rr.Mesh3D(vertex_positions=self.model.mesh_vert[va:va+vn],
                     triangle_indices=self.model.mesh_face[fa:fa+fn], albedo_factor=color), static=True)
             elif self.model.geom_type[gid] == self.mj.mjtGeom.mjGEOM_BOX:
-                rr.log(path, rr.Boxes3D(half_sizes=self.model.geom_size[gid], colors=color), static=True)
-        rr.send_blueprint(rrb.Vertical(rrb.Spatial3DView(origin="world"), rrb.Horizontal(
-            rrb.Spatial2DView(origin="world/cameras/head"), rrb.Spatial2DView(origin="world/cameras/wrist"))))
+                rr.log(path, rr.Boxes3D(half_sizes=self.model.geom_size[gid], colors=color, fill_mode="Solid"), static=True)
+        # Sensor depth projects into 3D by default. Keep it out of the model
+        # viewport so point clouds/frusta cannot obscure meshes or set its bounds.
+        rr.send_blueprint(rrb.Blueprint(rrb.Vertical(
+            rrb.Spatial3DView(name="自由视角 · 场景模型", origin="world",
+                contents=["world/geoms/**"], background=[235, 238, 242],
+                line_grid=False,
+                eye_controls=rrb.EyeControls3D(kind=rrb.Eye3DKind.Orbital,
+                    position=[1.05, -1.10, .85], look_target=[.25, 0, .12],
+                    eye_up=[0, 0, 1], spin_speed=0)),
+            rrb.Horizontal(
+                rrb.Spatial2DView(name="头部 RGB", origin="world/cameras/head",
+                    contents=["world/cameras/head/rgb"]),
+                rrb.Spatial2DView(name="腕部 RGB", origin="world/cameras/wrist",
+                    contents=["world/cameras/wrist/rgb"])),
+            row_shares=[.65, .35]), auto_layout=False, auto_views=False))
 
     def _log_rerun(self):
         rr = self.rr
@@ -262,6 +308,8 @@ class PiperMuJoCoController(ArmController):
 
     def stop(self):
         if self.data is not None:
+            self.model.actuator_biasprm[self._act[6:], 0] = self._gripper_bias0
+            self._gripper_preload_active = False
             self.data.ctrl[self._act] = self.data.qpos[self._qadr]
         self._closed = True
         if self.renderer is not None:

@@ -55,7 +55,7 @@ def test_actual_http_payload_excludes_truth_and_encodes_two_images(monkeypatch):
         images = [p["image_url"]["url"] for p in parts if p["type"] == "image_url"]
         assert len(images) == 2
         assert all(base64.b64decode(i.split(",")[1]).startswith(b"\x89PNG\r\n\x1a\n") for i in images)
-        assert set(json.loads(parts[0]["text"])["robot"]) == {"joint_rad", "gripper"}
+        assert set(json.loads(parts[0]["text"])["robot"]) == {"joint_rad", "gripper", "joint_limits_rad"}
         import io
         return io.BytesIO(json.dumps({"choices": [{"finish_reason": "stop", "message": {
             "content": '{"action":"wait"}'}}]}).encode())
@@ -87,6 +87,36 @@ def test_stale_and_repeated_cameras_rejected():
     session.read_raw = lambda name: frame
     with pytest.raises(RuntimeError, match="stale"):
         observation(session)
+
+
+@pytest.mark.parametrize("age_ns", [1_000_000_001, -1])
+def test_capture_still_rejects_stale_or_future_cameras(monkeypatch, age_ns):
+    session, now = VisualSession(), 20_000_000_000
+    frame = session.read_raw("left_arm")
+    frame["timestamp_ns"] = now
+    for value in frame["data"]["cameras"].values():
+        value["timestamp_ns"] = now
+    frame["data"]["cameras"]["head"]["timestamp_ns"] = now - age_ns
+    monkeypatch.setattr("robot.harness.vision.time.time_ns", lambda: now)
+    session.read_raw = lambda _: frame
+    with pytest.raises(RuntimeError, match="camera feedback stale"):
+        observation(session, local={})
+    assert session.writes == []
+
+
+@pytest.mark.parametrize("role", ["controller", "planner", "verifier"])
+def test_model_images_keep_acquisition_identity_without_local_calibration(role):
+    obs, stamps = observation(VisualSession())
+    earlier = {name: stamp - 2_000_000_000 for name, stamp in stamps.items()}
+    obs.update(previous_rgb=obs["rgb"], previous_image_timestamps_ns=earlier)
+    messages = build_messages(obs, "look", [], role=role, stage={"id": "target", "completion": "visible"})
+    labels = [part["text"] for part in messages[1]["content"][1:] if part["type"] == "text"]
+    expected = [("current", stamps)] if role == "verifier" else [("previous", earlier), ("current", stamps)]
+    assert labels == [f"{label} {name} RGB view; captured timestamp_ns={times[name]}"
+                      for label, times in expected for name in ("head", "wrist")]
+    if role == "controller":
+        assert json.loads(messages[1]["content"][0]["text"])["image_timestamps_ns"] == stamps
+    assert "SECRET" not in json.dumps(messages)
 
 
 @pytest.mark.parametrize("action", [
@@ -181,7 +211,7 @@ def test_pinocchio_eef_loop_and_model_input(tmp_path):
         np.testing.assert_allclose(state["eef_fk"]["tool"], initial)
         return dict(action="move_eef", pose=desired, frame="base", point="tool")
     load_example().run_loop(session, policy, stop, tmp_path / "eef", task="raise 1cm",
-                            max_rounds=1, kinematics=kin)
+                            max_rounds=1, kinematics=kin, legacy_actions=True)
     row = json.loads((tmp_path / "eef/turns.jsonl").read_text())
     assert row["status"] == "succeeded"
     assert row["eef_verification"]["position_error_m"] < .001
@@ -207,10 +237,10 @@ def test_eef_limits_and_failed_ik_cannot_reach_executor(monkeypatch):
     from robot.harness.kinematics import PiperKinematics
     kin = PiperKinematics(); q = [0, 1.3, -1, 0, .5, 0]
     action = dict(action="move_eef", pose=kin.pose(q, "tool"), frame="base", point="tool")
-    action["pose"][2] += .03
+    action["pose"][2] += .06
     with pytest.raises(ValueError, match="EEF step"):
         validate_action(action, q, kin)
-    action["pose"][2] -= .02
+    action["pose"][2] -= .05
     monkeypatch.setattr(kin, "solve", lambda *a, **kw: [0, 1.5, -1, 0, .5, 0])
     with pytest.raises(ValueError, match="joint step"):
         validate_action(action, q, kin)
@@ -231,14 +261,18 @@ def test_delta_one_centimetre_and_temporal_rgb_boundary(tmp_path):
             return dict(action="move_eef_delta", delta_xyz=[0,0,.01], frame="base", point="tool")
         assert len([c for c in messages[1]["content"] if c["type"] == "image_url"]) == 4
         assert "SECRET" not in json.dumps(messages)
-        feedback = json.loads(messages[1]["content"][0]["text"])["recent_actions"][0]
+        history = json.loads(messages[1]["content"][0]["text"])["recent_actions"]
+        assert len(history) == 1
+        feedback = history[-1]
+        assert feedback["status"] == "succeeded"
         assert feedback["action_resolution"]["scale"] == 1
+        assert feedback["actual_feedback"]["joint_rad"] == session.q
         return dict(action="wait")
     load_example().run_loop(session, policy, threading.Event(), tmp_path / "run", task="visual probe",
-                            interval=.001, max_rounds=2, kinematics=kin)
+                            interval=.001, max_rounds=2, kinematics=kin, legacy_actions=True)
     assert len(calls) == 2
     action = dict(action="move_eef_delta", delta_xyz=[0,0,.003], frame="base", point="tool")
-    with pytest.raises(ValueError, match="exactly 0.01"):
+    with pytest.raises(ValueError, match="0.01 to 0.05"):
         resolve_action(action, session.q, kin)
 
 
@@ -259,11 +293,12 @@ def test_eef_rotation_holds_tool_point_and_reduces_downward_tilt(tmp_path):
     np.testing.assert_allclose(Rotation.from_quat(new[[4,5,6,3]]).as_matrix(), expected.as_matrix(), atol=1e-12)
     def policy(messages):
         data=json.loads(messages[1]["content"][0]["text"])
-        assert data["scene_priors"]["nominal_bowl_rim_z_m"] == .05
+        assert "scene_priors" not in data
+        assert data["robot"]["eef_fk"]["tool_height_base_m"] == pytest.approx(original[2])
         assert "SECRET" not in json.dumps(messages)
         return action
     load_example().run_loop(session, policy, threading.Event(), tmp_path / "rotate", task="downward",
-                            max_rounds=1, kinematics=kin)
+                            max_rounds=1, kinematics=kin, legacy_actions=True)
     after = orientation_feedback(session.q, kin)
     assert after["tool_down_tilt_deg"] < before["tool_down_tilt_deg"] - .5
     np.testing.assert_allclose(kin.pose(session.q, "tool")[:3], original[:3], atol=.001)
@@ -316,16 +351,17 @@ def test_failed_move_replans_with_feedback_and_blocks_identical_retry(tmp_path, 
     def policy(messages):
         calls.append(messages)
         history=json.loads(messages[1]["content"][0]["text"])["recent_actions"]
-        if len(calls)==1:return first
+        if len(calls)==1:
+            return first
         if len(calls)==2:
             assert history[-1]["status"]=="failed"
             assert history[-1]["recovery"]["status"]=="ready"
             assert history[-1]["actual_feedback"]["joint_rad"]==session.q
-            return {**first,"joint":[float(x) for x in first["joint"]]}  # numeric spelling is not a new plan
+            return {**first,"joint":[float(x) for x in first["joint"]]}
         assert history[-1]["status"]=="rejected"
         session.stuck=False;q=list(session.q);q[0]+=.02
         return dict(action="move_joint_absolute",joint=q)
-    example.run_loop(session,policy,threading.Event(),tmp_path/"replan",task="adjust after failure",interval=.001,max_rounds=3)
+    example.run_loop(session,policy,threading.Event(),tmp_path/"replan",task="adjust after failure",interval=.001,max_rounds=3,legacy_actions=True)
     rows=[json.loads(x) for x in (tmp_path/"replan/turns.jsonl").read_text().splitlines()]
     assert [x["status"] for x in rows]==["failed","rejected","succeeded"]
     assert len(session.writes)==2 and session.released
@@ -342,7 +378,7 @@ def test_unknown_stop_does_not_recover_or_call_model_again(tmp_path,monkeypatch)
     def policy(messages):
         calls.append(messages);q=list(session.q);q[0]+=.02
         return dict(action="move_joint_absolute",joint=q)
-    example.run_loop(session,policy,threading.Event(),tmp_path/"unknown",task="move",max_rounds=3)
+    example.run_loop(session,policy,threading.Event(),tmp_path/"unknown",task="move",max_rounds=3,legacy_actions=True)
     assert len(calls)==1 and session.released
 
 
@@ -355,7 +391,7 @@ def test_consecutive_execution_failures_are_bounded(tmp_path,monkeypatch):
     def policy(messages):
         calls.append(messages);q=list(session.q);q[0]+=.02*len(calls)
         return dict(action="move_joint_absolute",joint=q)
-    example.run_loop(session,policy,threading.Event(),tmp_path/"bounded",task="move",interval=.001,max_rounds=10,max_failures=3)
+    example.run_loop(session,policy,threading.Event(),tmp_path/"bounded",task="move",interval=.001,max_rounds=10,max_failures=3,legacy_actions=True)
     rows=[json.loads(x) for x in (tmp_path/"bounded/turns.jsonl").read_text().splitlines()]
     assert len(calls)==3
     assert [x.get("recovery",{}).get("status") for x in rows]==["ready","ready",None]
@@ -374,5 +410,18 @@ def test_enter_after_failed_motion_skips_recovery(tmp_path,monkeypatch):
     def policy(messages):
         q=list(session.q);q[0]+=.02
         return dict(action="move_joint_absolute",joint=q)
-    example.run_loop(session,policy,stop,tmp_path/"enter",task="move")
+    example.run_loop(session,policy,stop,tmp_path/"enter",task="move",legacy_actions=True)
     assert session.released
+
+
+def test_json_mode_adds_transport_instruction_without_mutating_prompt(monkeypatch):
+    import io
+    messages=[{'role':'system','content':'Use robot tools.'},{'role':'user','content':'observe'}]
+    def urlopen(request, timeout):
+        payload=json.loads(request.data)
+        assert 'JSON' in payload['messages'][0]['content']
+        assert payload['response_format']=={'type':'json_object'}
+        return io.BytesIO(json.dumps({'choices':[{'finish_reason':'stop','message':{'content':'{"tool":"capture_camera","arguments":{}}'}}]}).encode())
+    monkeypatch.setattr('urllib.request.urlopen',urlopen)
+    assert chat_action(messages,'secret','model','http://localhost/v1')['tool']=='capture_camera'
+    assert messages[0]['content']=='Use robot tools.'

@@ -51,7 +51,7 @@ def build(output, robotwin_assets):
     scale = np.array(metadata["scale"])
     xml = ET.Element("mujoco", model="piper_three_bowls")
     ET.SubElement(xml, "compiler", angle="radian", eulerseq="XYZ", meshdir="meshes", autolimits="true")
-    ET.SubElement(xml, "option", timestep="0.002", integrator="implicitfast", cone="elliptic", iterations="80")
+    ET.SubElement(xml, "option", timestep="0.002", integrator="implicitfast", cone="elliptic", iterations="80", impratio="100")
     visual = ET.SubElement(xml, "visual")
     ET.SubElement(visual, "global", offwidth="640", offheight="480")
     asset = ET.SubElement(xml, "asset")
@@ -150,7 +150,7 @@ def build(output, robotwin_assets):
         ET.SubElement(asset, "mesh", name=f"bowl_collision_{i}", file=f"bowl_collision_{i}.stl")
     if len(parts) < 2:
         raise ValueError("Bowl collision asset lacks multiple convex pieces; refusing a filled cavity")
-    for i, (x, y) in enumerate(((.42, -.12), (.46, .18), (.25, .23))):
+    for i, (x, y) in enumerate(((.32, -.12), (.46, .18), (.25, .23))):
         body = ET.SubElement(world, "body", name=f"bowl_{i}", pos=f"{x} {y} 0.08", quat="0.5 0.5 0.5 0.5")
         ET.SubElement(body, "freejoint", name=f"bowl_{i}_free")
         # Approximate bowl inertia, explicitly separate from visual mesh volume.
@@ -164,7 +164,7 @@ def build(output, robotwin_assets):
     ET.ElementTree(xml).write(output / "scene.xml", encoding="unicode")
     manifest = {"source": "TianxingChen/RoboTwin2.0: objects/002_bowl model_id=3; local RoboTwin asset copy",
                 "collision_pieces": len(parts), "bowl_scale": scale.tolist(), "bowl_mass_kg": .08,
-                "initial_bowl_positions_m": [[.42, -.12, .08], [.46, .18, .08], [.25, .23, .08]],
+                "initial_bowl_positions_m": [[.32, -.12, .08], [.46, .18, .08], [.25, .23, .08]],
                 "robot_collision": "one convex hull per visual link, approximate; robot self-collision disabled",
                 "sources": {str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else str(p.relative_to(robotwin_assets)):
                             hashlib.sha256(p.read_bytes()).hexdigest() for p in source_files}}

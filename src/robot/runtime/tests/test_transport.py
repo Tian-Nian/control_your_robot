@@ -105,7 +105,6 @@ def test_attacher_exit_keeps_the_segment():
         )
         subprocess.run([sys.executable, "-c", script, shm], check=True, env=env)
         time.sleep(0.5)
-        assert os.path.exists(f"/dev/shm/{shm}")
         again = Bus.attach(shm)
         try:
             assert again.read_state("left_arm")["data"]["joint"] == [1.0]

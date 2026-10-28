@@ -182,14 +182,31 @@ def test_hmi_quits_without_stopping_the_service(tmp_path):
         assert b"left_arm" in output
         assert b"cam_head" in output
         os.write(master, b"jq")
-        process.wait(timeout=5)
+        # Keep draining curses output: a full PTY buffer can block redraw/exit
+        # on macOS even after q has been delivered.
+        deadline = time.monotonic() + 5
+        while process.poll() is None and time.monotonic() < deadline:
+            ready, _, _ = select.select([master], [], [], .1)
+            if ready:
+                try:
+                    os.read(master, 65536)
+                except OSError:
+                    break
+        process.wait(timeout=1)
         time.sleep(0.5)
-        assert os.path.exists(f"/dev/shm/{shm}")
+        # POSIX shared memory is not mounted at /dev/shm on macOS.
+        from robot.runtime.transport import Bus
+        attached = Bus.attach(shm)
+        attached.close()
         assert status() == 0
     finally:
         if process.poll() is None:
             os.killpg(process.pid, signal.SIGTERM)
-            process.wait(timeout=2)
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait(timeout=2)
         os.close(master)
         stop()
 

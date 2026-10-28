@@ -29,6 +29,13 @@ def _positive(value, name):
     return value
 
 
+class FeedbackAgeError(RuntimeError):
+    """Timestamp age failure, distinct from mode, servo and lease faults."""
+    def __init__(self, age_ms, max_age_ms):
+        self.age_ms, self.max_age_ms = age_ms, max_age_ms
+        super().__init__(f"stale or future feedback: age={age_ms:.1f} ms, limit={max_age_ms:.1f} ms")
+
+
 class PositionExecutor:
     """One component, absolute joint/gripper goals, fresh-feedback verification.
 
@@ -98,7 +105,7 @@ class PositionExecutor:
         stamp = int(frame["timestamp_ns"])
         age = (time.time_ns() - stamp) / 1e6
         if stamp <= 0 or age < 0 or age > self.max_age_ms:
-            raise RuntimeError("stale or future feedback")
+            raise FeedbackAgeError(age, self.max_age_ms)
         data = frame["data"]
         if data.get("control_mode") != "position":
             raise RuntimeError("position mode required")

@@ -1,3 +1,6 @@
 # Explicit opt-in for the MuJoCo visual agent with local Pinocchio FK/IK.
 -r harness-mujoco.txt
 pin==4.1.0
+
+# Optional RGB-only local feature tracking; no model weights or scene labels.
+opencv-python-headless>=4.10,<6

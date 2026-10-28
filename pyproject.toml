@@ -41,6 +41,9 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"robot.harness" = ["prompts/*.txt"]
+
 # 你原来就有的
 [tool.uv.workspace]
 members = ["packages/*"]

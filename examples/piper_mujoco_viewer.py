@@ -28,7 +28,7 @@ def sync_view(model, state):
     model._cameras = state["cameras"]
 
 
-def ensure_viewer(directory):
+def ensure_viewer(directory, *, reset_view=False):
     directory.mkdir(parents=True, exist_ok=True)
     pidfile = directory / "viewer.json"
     request = directory / "viewer.reopen"
@@ -41,6 +41,15 @@ def ensure_viewer(directory):
             pid = None
     except (OSError, ValueError, KeyError):
         pass
+    if reset_view and pid is not None:
+        # Only the validated read-only bridge is restarted, never the runtime.
+        os.kill(pid, signal.SIGTERM)
+        deadline = time.monotonic() + 5
+        while pidfile.exists() and time.monotonic() < deadline:
+            time.sleep(.1)
+        if pidfile.exists():
+            raise RuntimeError("只读 viewer 尚未退出；未启动第二个 bridge，请稍后重试")
+        pid = None
     ready.unlink(missing_ok=True)
     request.touch()
     def launch():
@@ -118,11 +127,12 @@ def run_viewer(directory):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ensure", action="store_true")
+    parser.add_argument("--reset-view", action="store_true", help="Reload the read-only bridge and reset the 3D view; leaves robot runtime untouched")
     parser.add_argument("--directory", type=Path)
     args = parser.parse_args()
     directory = args.directory or Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "cyr"
     if args.ensure:
-        ensure_viewer(directory)
+        ensure_viewer(directory, reset_view=args.reset_view)
     else:
         run_viewer(directory)
 

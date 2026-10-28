@@ -11,15 +11,25 @@ components:
       name: left_arm
       cameras: true
       camera_hz: 10
+      # Per-finger closing preload, within the existing 10 N total force limit.
+      gripper_preload_n: 2.0
+      # Side-oblique overview reduces arm occlusion; wrist keeps its RoboTwin mount.
+      head_camera_profile: oblique
       width: 320
       height: 240
       spawn: true
     setup:
       control_mode: position
-    publish: [joint, eef, gripper, gripper_joint_m, velocity, control_mode, servo_fault, objects, contacts, cameras, sim_time]
+    publish: [joint, eef, gripper, gripper_joint_m, gripper_command, gripper_actuator_force_n, gripper_preload_n, velocity, control_mode, servo_fault, objects, contacts, cameras, sim_time]
     rate_hz: 50
     max_bytes: 4194304
     stream_timeout_s: 3.0
+    # Queued cyr call goals are interpolated; streaming harness targets keep their gate.
+    motion:
+      enabled: true
+      max_step_rad: 0.02
+      tol_rad: 0.005
+      timeout_s: 15.0
     gate:
       lower: [-2.618, 0, -2.697, -1.832, -1.22, -3.14]
       upper: [2.618, 3.14, 2.697, 1.832, 1.22, 3.14]

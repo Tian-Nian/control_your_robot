@@ -1,0 +1,17 @@
+TASK SKILL: pick-up-object (Piper adaptation of RoboHarness ARX_X5)
+
+Inspect the latest head image and select a reachable physical surface of the intended object. For a bowl select visible material on the rim/body, not its hollow centre, support table or an imagined point. Bind normalized u/v to the latest image_id. Use read_depth to check the sampled surface and compare views.
+
+plan_grasp_rgbd generates a Piper-specific downward approach to that RGB-D surface, with optional yaw_deg and approach_m. It is NOT the upstream X5 volume-filtered collision planner: it only checks local depth support and Piper FK/IK. Inspect selected_surface, target poses and waypoint count; ensure the intended fingers will straddle the chosen material and visually check clearance. yaw changes the finger closing direction. Reclick the current surface after failure rather than searching seeds at an uncertain point. You can instead construct explicit plan_pose / plan_eef adjustments from measured geometry when the generic surface approach is unsuitable.
+
+Open explicitly before creating the plan. Execute only the chosen current plan. Inspect the new wrist image to assess the actual finger/material relationship; a planned endpoint does not establish enclosure. Correct position and angle with tool- or camera-frame plan_eef as needed. Close explicitly when geometry supports it. The close target remains latched during subsequent lift, so an obstructed measured opening is not automatically a failure and is never called a detected grasp.
+
+Inspect fresh head/wrist images after closing, then lift along a reachable clear direction. Verify object motion with the gripper and separation from support. If the object stayed behind, inspect the missed geometry, reopen when safe and select a new approach. If motion fails, inspect current measured joints/FK and latest images, change the approach or posture, and retry deliberately. There is no fixed number of recovery attempts.
+
+Deactivate this skill after a visibly stable useful grasp/lift or when abandoning this attempt. finish must describe current visual evidence, not gripper commands or an inferred contact. No task success is supplied by hidden simulation state.
+
+A result kind=ik_not_converged is a read-only planning failure: no portion of that plan was executed. Inspect failed_segment and attempted_pose_base_wxyz; a failed first segment means the current posture already obstructs that direction, not merely that the total lift is too long. Use current measured joints/FK and images to revise the direction and/or orientation, or make an informed joint adjustment, then create a new plan. Keep a possibly held object closed unless current support/empty-grasp evidence justifies opening.
+
+close_gripper returns gripper_observation_complete separately from joint_arrived. Contact can leave the fingers partly open and deflect arm joints. Read measured_gripper, joint_error_rad and any warning; neither incomplete closure nor joint deflection alone establishes a grasp failure or success. Confirm with current images and a reachable lift.
+
+When gripper_drive is available it reports the simulator's actuator output, not measured contact with the target. A zero close command can include a persistent per-finger preload; negative actuator force means closing. Compare command and preload to detect whether the driver is still applying close intent, but do not interpret nonzero force as proof of holding an object. Empty fully closed fingers can also exert force against their joint limits.

@@ -418,7 +418,7 @@ def _apply_command(spec: dict, component, command: dict) -> None:
         solved = _solve_eef(spec, component, eef, bool(command["is_delta"]))
         if solved is not None:
             joints, absolute = solved
-            payload = {"joint": joints.tolist(), "eef": np.asarray(absolute, dtype=float).reshape(-1).tolist()}
+            payload = {**payload, "joint": joints.tolist(), "eef": np.asarray(absolute, dtype=float).reshape(-1).tolist()}
     elif command["is_delta"] and "joint" in payload:
         current = _current_joint(component)
         try:
@@ -445,6 +445,11 @@ def _apply_command(spec: dict, component, command: dict) -> None:
     if mode is not None:
         _apply_mode(component, mode)
     if checked is not None and _motion_enabled(spec):
+        if "gripper" in payload:
+            try:
+                component.set_gripper(payload["gripper"])
+            except (TypeError, ValueError) as exc:
+                raise CommandRejected(str(exc)) from exc
         _start_joint(spec, component, checked, int(command["seq"]))
         return
     move = getattr(component, "move", None)
@@ -457,7 +462,13 @@ def _apply_command(spec: dict, component, command: dict) -> None:
 
 def _apply_reset(spec: dict, component, start_state, seq: int) -> None:
     """调用控制器自己的 reset。整段轨迹由 set_joint 插值发出，不把零位一次下发。"""
-    del seq
+    runtime_goal = getattr(component, "runtime_reset_target", None)
+    if runtime_goal is not None and _motion_enabled(spec):
+        try:
+            _begin_joint(spec, component, runtime_goal(start_state), seq, eef=None)
+        except (TypeError, ValueError) as exc:
+            raise CommandRejected(str(exc)) from exc
+        return
     goal = _reset_goal(spec, component, start_state)
     if goal is not None and (_motion_enabled(spec) or _gate_configured(spec, component)):
         goal = _gate(spec, component, _current_joint(component), goal, eef=None, trajectory=True)
@@ -544,11 +555,21 @@ def _step_motion(component) -> None:
 
 
 def _solve_eef(spec: dict, component, eef, is_delta: bool):
-    """返回 (关节解, 绝对末端)。没有身体模型时返回 None，原样下发。"""
+    """返回 (关节解, 绝对末端)。优先 body，随后设备 IK；都没有才原样下发。"""
     body = getattr(component, "_cyr_body", None)
     arm = _arm_name(spec)
     if body is None or arm not in body.arm_names():
-        return None
+        solver = getattr(component, "solve_ik", None)
+        if solver is None:
+            return None
+        try:
+            from robot.runtime.frames import compose_delta
+
+            target = (compose_delta(component.get_state()["eef"], eef)
+                      if is_delta else np.asarray(eef, dtype=float))
+            return np.asarray(solver(target), dtype=float), target
+        except (TypeError, ValueError, RuntimeError) as exc:
+            raise CommandRejected(str(exc)) from exc
     current = _current_joint(component)
     try:
         raw = np.asarray(eef, dtype=float).reshape(-1)

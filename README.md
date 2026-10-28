@@ -16,6 +16,30 @@ cyr stop
 
 Hardware is optional. `config/runtime/test_robot.yml` uses in-process test devices. `config/runtime/piper_sim.yml` is the Piper simulator in position mode. Gravity and impedance use `piper_sim_gravity.yml` and `piper_sim_impedance.yml`. `config/runtime/marvin_lab.yml` is the Marvin lab bench.
 
+## Optional MuJoCo and visual agent
+
+Piper Sim remains the teaching default. Install the contact/vision stack explicitly in a separate environment:
+
+```bash
+python3 -m venv .venv-harness
+source .venv-harness/bin/activate
+python -m pip install -r requirements/harness-vision.txt
+python -m pip install --no-deps -e .
+python examples/piper_mujoco_harness.py --pick-test
+bash examples/piper_mujoco.sh start
+bash examples/piper_mujoco.sh viewer
+# Configure a vision-capable model API using the guide before starting:
+bash examples/piper_mujoco.sh agent
+```
+
+The default `robowork` architecture uses one agent, head/wrist RGB-D, explicit skills, read-only planning and single-use execution. It supports tool/base/camera-frame translation and rotation plus joint control. Gripper targets persist across motion and model inference, with bounded simulated closing preload. Simulator object/contact truth is excluded from model input. Enter, explicit finish, or runtime faults end the loop; there are no former stage/recovery budgets.
+
+The same device accepts `cyr call` for absolute/delta joints, flange poses, gripper and arm-only reset. Queued motion interpolates and checks joint feedback. Restart rebuilds the entire scene; resume uses fresh observations in the existing scene. Rerun is a separate read-only viewer, and reports summarize logged failures and exit sources offline.
+
+See the [complete current usage guide](docs/harness_robowork.md) for installation, API configuration, every entry point and option, tool semantics, manual commands, logs and troubleshooting. The [PositionExecutor API](docs/harness.md) and [scene asset guide](assets/sim/piper_mujoco/README.md) remain separate. Previous layered behavior requires explicit `--architecture layered`.
+
+Fixed-trajectory contact grasp, 15-second hold and release are validated; reliable autonomous visual grasping and three-bowl stacking are not. Plans do not certify scene collision freedom. MuJoCo is not installed by default.
+
 ## Commands
 
 | Command | What it does |
@@ -324,10 +348,6 @@ If the WeChat group has expired, add the personal account to join.
 
 Run `python examples/piper_harness.py` for an isolated Piper Sim task with fresh-feedback verification, request deduplication and a JSONL event journal. Add `--viewer` for a separate Rerun window. See [the harness guide](docs/harness.md) for prerequisites, API and interruption semantics.
 
-For opt-in physical contact and RGB-agent experiments, install the dedicated
-`requirements/harness-vision.txt` environment, then use
-`bash examples/piper_mujoco.sh start` and `bash examples/piper_mujoco.sh agent`.
-The [same guide](docs/harness.md#optional-mujoco-contact-and-visual-agent-guide)
-covers model configuration, observation boundaries, XYZ/rotation control,
-verified recovery and Enter-to-stop behavior. MuJoCo is not a default dependency;
-fixed physical grasp tests pass, while autonomous visual grasping remains unvalidated.
+For the current RGB-D tool workspace, use the [current MuJoCo agent guide](docs/harness_robowork.md).
+
+MuJoCo exception: without a body adapter, the runtime uses the device’s local `solve_ik` for full flange position AND orientation. With motion tracking enabled, its `runtime_reset_target` is interpolated without blocking physics. These are distinct from the older body position-only IK and controller-specific reset implementations.

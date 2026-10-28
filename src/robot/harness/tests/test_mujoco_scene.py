@@ -155,11 +155,20 @@ def test_actual_contact_pick_lift_and_release(scene):
         scene.set_joint(scene.solve_ik([*xyz, np.cos(a), 0, np.sin(a), 0], "tool"))
         return advance(scene, 3)
     scene.set_gripper(1); advance(scene, .6)
-    move([.42, -.04, .17], 145)
-    move([.42, -.04, .035], 180)
+    move([.32, -.04, .17], 145)
+    move([.32, -.04, .035], 180)
     scene.set_gripper(0); advance(scene, 2)
-    lifted = move([.42, -.04, .17], 145)
+    lifted = move([.32, -.04, .17], 145)
     assert grasp_evidence(lifted, "bowl_0", start_z)["grasped_and_lifted"]
+    # A short lift alone missed slow soft-contact creep. Verify sustained hold.
+    assert scene.model.opt.noslip_iterations == 0
+    assert scene.model.opt.impratio == 100
+    for _ in range(15):
+        held = advance(scene, 1)
+        assert grasp_evidence(held, "bowl_0", start_z)["grasped_and_lifted"]
+        assert abs(held["objects"]["bowl_0"]["pose"][2] - lifted["objects"]["bowl_0"]["pose"][2]) < .003
+        assert held["gripper_command"] == 0 and held["gripper_preload_n"] == 2
+        assert np.max(np.abs(held["gripper_actuator_force_n"])) <= 10.00001
     scene.set_gripper(1)
     released = advance(scene, 3)
     assert not grasp_evidence(released, "bowl_0", start_z)["bilateral_contact"]
@@ -212,3 +221,121 @@ def test_rgbd_timestamp_intrinsics_and_rerun_recording(tmp_path):
     finally:
         device.stop()
     assert (tmp_path / "scene.rrd").stat().st_size > 10000
+
+
+@pytest.mark.parametrize("dx", [-.01, 0., .01])
+def test_near_orange_rim_allows_six_vertical_agent_steps_and_retreat(scene, dx):
+    """The default rim and a 1 cm lateral margin must allow the real bounded tool."""
+    pytest.importorskip("pinocchio")
+    from robot.harness.kinematics import PiperKinematics
+    from robot.harness.policy import interpret
+    kin = PiperKinematics()
+    advance(scene, 1.)
+    # This is a fixed fixture preposition, not an agent supplied object pose.
+    bowl_xy = scene.model.body("bowl_0").pos[:2]
+    start = [bowl_xy[0] + dx, bowl_xy[1] + .08, .095, 0., 0., 1., 0.]
+    scene.set_joint(scene.solve_ik(start, "tool"))
+    scene.set_gripper(1.)
+    state = advance(scene, 2.)
+    assert kin.error(state["joint"], start, "tool")[0] < .001
+    for direction in (["z+"] * 6 + ["z-"] * 6):
+        q = scene.get_state()["joint"].tolist()
+        target, info = interpret({"action": "tool_move", "direction": direction,
+                                  "reason": "验证近处碗沿的1cm垂直进退"}, q, kin)
+        assert np.max(np.abs(np.asarray(target["joint"]) - q)) <= .08
+        scene.set_joint(target["joint"])
+        state = advance(scene, .6)
+        pe, re = kin.error(state["joint"], info["target_pose"], "tool")
+        assert pe < .001 and re < .01
+    assert abs(kin.pose(state["joint"], "tool")[2] - .095) < .001
+
+
+def test_logged_wait_pose_has_feasible_directions_and_small_joint_limit_relief(scene):
+    """Replay the logged robot posture only; no automatic grasp/escape assertion."""
+    pytest.importorskip("pinocchio")
+    from robot.harness.kinematics import PiperKinematics
+    from robot.harness.policy import interpret
+    from robot.harness.recovery import recovery_options
+    from robot.harness.vision import one_cm_options
+    q = [-.3718572040898985, 1.6477429036329063, -1.5816930383846342,
+         .1598376707855643, 1.2015320066944835, -.3994725660921034]
+    scene.set_joint(q); scene.set_gripper(0.)
+    state = advance(scene, 2.)
+    kin = PiperKinematics()
+    fk = {"tool": kin.pose(state["joint"], "tool"),
+          "one_cm_translation_options": one_cm_options(state["joint"], kin),
+          "tool_translation_options": one_cm_options(state["joint"], kin, frame="tool")}
+    options = recovery_options(state["joint"], kin, fk)
+    base_moves = {item["direction"] for item in options["feasible_base_moves"]}
+    assert "up" not in base_moves and {"back", "down"} <= base_moves
+    relief = next(item for item in options["joint_steps"] if item["action"] == {
+        "action": "joint_step", "joint_index": 5, "sign": -1})
+    assert relief["relieves_near_joint_limit"]
+    assert relief["delta_xyz_base_m"][2] > .002
+    target, _ = interpret({**relief["action"], "reason": "固定姿态复现：缓解第5轴上限"}, state["joint"].tolist(), kin)
+    scene.set_joint(target["joint"])
+    after = advance(scene, .6)
+    assert after["joint"][4] < state["joint"][4] - .035
+    assert kin.pose(after["joint"], "tool")[2] > fk["tool"][2] + .002
+
+
+def test_oblique_head_profile_keeps_wrist_mount_and_published_calibration_consistent():
+    if os.environ.get('CYR_TEST_MUJOCO_RENDER') != '1':
+        pytest.skip('rendering requires CYR_TEST_MUJOCO_RENDER=1')
+    device = PiperMuJoCoController(cameras=True, head_camera_profile='oblique')
+    device.set_up()
+    try:
+        advance(device, 1.)
+        # Recorded posture where the original head view hid the orange bowl.
+        device.data.qpos[device._qadr[:6]] = [-.297495862152, 1.824204305, -1.332733256,
+                                              .048476410, 1.006526595, -.320344908]
+        device.mj.mj_forward(device.model, device.data)
+        device._capture()
+        camera = device.get_state()['cameras']['head']
+        np.testing.assert_allclose(camera['world_from_camera'][:3], [.75, -.65, .65])
+        assert camera['intrinsics'][0, 0] == pytest.approx(120 / np.tan(np.deg2rad(25)))
+        assert device.model.cam_fovy[device.model.camera('wrist').id] == 37
+        renderer = device.renderer
+        renderer.enable_segmentation_rendering()
+        renderer.update_scene(device.data, camera='head')
+        segmentation = renderer.render()
+        bowl = device.model.body('bowl_0').id
+        geoms = np.where(device.model.geom_bodyid == bowl)[0]
+        visible = np.isin(segmentation[:, :, 0], geoms) & (segmentation[:, :, 1] == int(device.mj.mjtObj.mjOBJ_GEOM))
+        assert visible.sum() > 30
+    finally:
+        device.stop()
+
+
+def test_closing_preload_persists_at_thin_gap_and_is_force_limited(scene):
+    scene.set_gripper(0)
+    ids=scene._act[6:]
+    for _ in range(3):
+        # Frozen joint probes isolate the actuator law from contact geometry.
+        scene.data.qpos[scene._qadr[6:]]=.001
+        scene.data.qvel[scene._vadr[6:]]=0
+        scene.data.ctrl[ids]=0
+        scene.mj.mj_forward(scene.model,scene.data)
+        np.testing.assert_allclose(scene.data.actuator_force[ids],[-2.5,-2.5],atol=1e-8)
+        scene.set_joint(scene.get_state()['joint'])
+    scene.data.qpos[scene._qadr[6:]]=.04
+    scene.mj.mj_forward(scene.model,scene.data)
+    np.testing.assert_allclose(scene.data.actuator_force[ids],[-10,-10])
+    scene.set_gripper(1)
+    np.testing.assert_allclose(scene.model.actuator_biasprm[ids,0],0)
+    assert scene.get_state()['gripper_preload_n']==0
+
+
+def test_runtime_hold_clears_preload_even_if_measured_width_is_zero(scene):
+    from robot.runtime.node import _stop_stream
+    scene.set_gripper(0)
+    scene.data.qpos[scene._qadr[6:]]=0
+    _stop_stream(scene,'stop requested')
+    assert not scene._gripper_preload_active
+    np.testing.assert_allclose(scene.model.actuator_biasprm[scene._act[6:],0],0)
+
+
+@pytest.mark.parametrize('force',[-1,11,float('nan')])
+def test_invalid_gripper_preload_is_rejected(force):
+    with pytest.raises(ValueError,match='gripper_preload_n'):
+        PiperMuJoCoController(cameras=False,gripper_preload_n=force)
