@@ -7,12 +7,36 @@ if [[ ! -x "$PYTHON" ]]; then
     echo "未找到 $PYTHON；请先安装专用 .venv-harness 环境。" >&2
     exit 1
 fi
-export XDG_STATE_HOME="$ROOT/save/mujoco-runtime"
 cd "$ROOT"
 COMMAND="${1:-status}"
 if [[ $# -gt 0 ]]; then shift; fi
+# Respect the same discovery directory as a direct cyr invocation. Do not
+# silently strand a service launched by the older project-local wrapper.
+if [[ "$COMMAND" != report ]]; then
+    "$PYTHON" - "$ROOT" <<'PYTHON'
+import sys
+from pathlib import Path
+from robot.runtime.discover import load_records, user_state_dir
+from robot.runtime.transport import pid_alive
+legacy = Path(sys.argv[1]) / "save/mujoco-runtime/cyr"
+if legacy.resolve() != user_state_dir().resolve():
+    old = [r for r in load_records(legacy / "runtime.json")
+           if r.get("shm_name") == "cyr_piper_mujoco" and pid_alive(int(r["pid"]))]
+    if old:
+        print(f"旧目录仍有 MuJoCo 服务 pid={old[0]['pid']}；未停止或重置它。", file=sys.stderr)
+        print('先退出 agent；迁移会重置场景。在仓库根目录执行：', file=sys.stderr)
+        print('XDG_STATE_HOME="$PWD/save/mujoco-runtime" .venv-harness/bin/python -m robot.runtime stop', file=sys.stderr)
+        print('unset XDG_STATE_HOME', file=sys.stderr)
+        print('bash examples/piper_mujoco.sh start', file=sys.stderr)
+        print('若要保留旧场景，临时 export XDG_STATE_HOME="$PWD/save/mujoco-runtime" 后继续使用。', file=sys.stderr)
+        sys.exit(2)
+PYTHON
+fi
 case "$COMMAND" in
-    start) exec "$PYTHON" -m robot.runtime start --config "$ROOT/config/runtime/piper_mujoco.yml" "$@" ;;
+    start)
+        "$PYTHON" -m robot.runtime start --config "$ROOT/config/runtime/piper_mujoco.yml" "$@"
+        exec "$PYTHON" "$ROOT/examples/piper_mujoco_viewer.py" --ensure
+        ;;
     stop|restart|status) exec "$PYTHON" -m robot.runtime "$COMMAND" "$@" ;;
     viewer) exec "$PYTHON" "$ROOT/examples/piper_mujoco_viewer.py" --ensure "$@" ;;
     agent)

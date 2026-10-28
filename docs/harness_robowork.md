@@ -51,7 +51,7 @@ bash examples/piper_mujoco.sh agent --task '夹住并抬起橙色碗，以新图
 
 | 入口 | 用途与影响 |
 | --- | --- |
-| `bash examples/piper_mujoco.sh start` | 启动或复用同一场景；已运行时不重置 |
+| `bash examples/piper_mujoco.sh start` | 启动或复用同一场景，并确保只读 Rerun 打开；已运行时不重置 |
 | `... status` / `... stop` | 查看服务 / 停止服务；停止不等于保存物理快照 |
 | `... restart` | 加载新的驱动、场景或配置，重置物体 |
 | `... viewer` | 独立只读 Rerun：自由 3D 场景、头部 RGB、腕部 RGB |
@@ -64,7 +64,7 @@ bash examples/piper_mujoco.sh agent --task '夹住并抬起橙色碗，以新图
 | `... teleop` | 历史 layered 工具的人工调试终端；不等价于默认 robowork 持续夹持执行器 |
 | `cyr call left_arm JSON` | 同一设备的关节/法兰/夹爪/reset；详见本文后面的完整示例 |
 
-表内 `...` 表示 `bash examples/piper_mujoco.sh`。脚本统一使用 `.venv-harness` 和 `save/mujoco-runtime` 发现目录，避免操作到其他教学服务。
+表内 `...` 表示 `bash examples/piper_mujoco.sh`。脚本使用 `.venv-harness`，继承与直接 `cyr` 相同的发现目录，默认 `~/.local/state/cyr`，不再偷偷覆盖 `XDG_STATE_HOME`。`stop` 会停止该目录内所有已登记服务；多服务并存时普通 CLI 不能选择组件所属服务，应使用 `Session.attach(name)`。
 
 默认 agent 参数：`--task` 设置任务，`--max-rounds N` 限制本次循环（0 不限，默认 0），`--interval SEC` 设置轮间间隔（默认 1，范围 0.2～60），`--out PATH` 指定新日志目录，`--dry-run` 使用本地观察策略。`--resume` 保留原任务，不能换成另一个任务或重放旧动作。`--architecture layered` 才启用旧阶段/等待/恢复预算；旧参数不能混入默认模式。完整选项可运行 `python examples/piper_mujoco_agent.py --help`。
 
@@ -261,12 +261,12 @@ bash examples/piper_mujoco.sh agent
 先在 agent 终端按 Enter，等它释放控制租约。不要让 agent 和手动命令同时控制机械臂。
 第一次更新到支持排队轨迹的版本时，执行 `bash examples/piper_mujoco.sh restart` 加载新代码与配置；这会重建场景、重置碗。之后手动控制不需要重启。
 
-在新的终端执行以下环境准备。`XDG_STATE_HOME` 必须与启动脚本一致，否则 `cyr` 可能找不到服务或连接到另一套服务记录。
+在新的终端执行以下环境准备。正常使用无需设置 `XDG_STATE_HOME`；曾经设置旧路径的终端应先按下面迁移说明关闭旧服务，再 unset。自定义该变量时，所有启动和控制终端必须保持一致。
 
 ```bash
 cd /Users/niantian/projects/control_your_robot
 source .venv-harness/bin/activate
-export XDG_STATE_HOME="$PWD/save/mujoco-runtime"
+unset XDG_STATE_HOME  # 使用默认服务目录；仅旧服务迁移期间才使用旧路径
 cyr start --config config/runtime/piper_mujoco.yml
 cyr call left_arm '{"op":"release"}'
 cyr echo left_arm
@@ -327,3 +327,30 @@ cyr call left_arm '{"gripper":0}'  # 持续闭合并施加预紧
 夹爪命令的 `accepted:true` 表示目标已下发，不等于已到位或已抓稳；检查 `gripper_command`、实测 `gripper` 和双视角图像。`gripper_actuator_force_n` 是仿真执行器输出，不是接触力或抓取成功证据。停止/安全保持可能撤销预紧，不能承诺停止后悬空物体仍被夹住。
 
 关节目标也可以与夹爪目标放在同一条 JSON 中，例如 `{"joint":[0,1.3,-1,0,0.5,0],"gripper":0}`。夹爪从运动开始就接收该目标，不是在机械臂到位后才闭合。抓取时应按实际需要分开发送命令。
+
+## 服务目录迁移、可视化与 reset
+
+新启动脚本不再覆盖 `XDG_STATE_HOME`，默认与原生 `cyr` 一样使用 `~/.local/state/cyr`。自动化隔离测试仍使用临时目录。若旧版本服务仍在 `save/mujoco-runtime` 中运行，脚本会提示 PID 和迁移步骤，不会偷偷停止它。
+
+要迁移，先按 Enter 退出 agent，然后在代码仓库根目录执行（会重建场景、重置碗）：
+
+```bash
+XDG_STATE_HOME="$PWD/save/mujoco-runtime" .venv-harness/bin/python -m robot.runtime stop
+unset XDG_STATE_HOME
+bash examples/piper_mujoco.sh start
+source .venv-harness/bin/activate
+cyr status
+```
+
+若当前场景必须保留，可以暂时继续在各终端设置旧路径；等实验结束再迁移。不要只 unset 后启动第二份同名服务。Shell 脚本内部的环境变量不会传回父终端，因此旧脚本和手输命令才会产生目录不一致。
+
+`bash examples/piper_mujoco.sh start` 现在同时确保只读 Rerun 打开。原生 `cyr start` 负责设备生命周期：已有服务时直接复用，不重跑设备初始化，也不会重新弹窗。窗口被关闭时运行 `bash examples/piper_mujoco.sh viewer`；布局异常用 `viewer --reset-view`，不会重置物理场景。
+
+| 想做的事 | 命令 | 结果 |
+| --- | --- | --- |
+| 回准备姿态 | `cyr call left_arm '{"op":"reset"}'` | 回 `[0,1.3,-1,0,0.5,0]`；若已在此姿态不会明显运动 |
+| 六轴回零 | `cyr call left_arm '{"op":"reset","start_state":[0,0,0,0,0,0]}'` | 六轴目标全零，经过插值和到位检查 |
+| 直接指定零位 | `cyr call left_arm '{"joint":[0,0,0,0,0,0]}'` | 同样是六轴绝对目标 |
+| 重置碗和机械臂 | `bash examples/piper_mujoco.sh restart` | 重建整个场景 |
+
+两种关节复位都保留夹爪目标和物体状态。命令没有运动时先看返回 JSON 的 accepted/error；不要把默认 reset 理解成全零或物理世界重置。当前目录没有服务时，`cyr stop` 会明确显示目录以及“未停止其他目录的服务”，不再误报已经停止全部进程。

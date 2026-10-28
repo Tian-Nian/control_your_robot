@@ -342,3 +342,5 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest src/robot/runtime/tests src/ro
 新增 `PositionExecutor`：绝对关节/夹爪技能、观测新鲜度与持续误差验证、请求去重、顺序任务、取消请求和 JSONL 证据记录。默认示例自行启动独立 Piper Sim：`python examples/piper_harness.py`，可加 `--viewer`。输入、结果状态和能力边界见 [Harness 使用说明](docs/harness.md)。
 
 MuJoCo 特例：没有 body 适配器时，runtime 使用设备本地 `solve_ik`，同时求解法兰位置和姿态；启用 motion 时通过 `runtime_reset_target` 非阻塞插值复位，物理仿真持续运行。不要套用上文旧 body 的仅位置 IK 或其他控制器的 reset 细节。
+
+启动脚本现在与直接 `cyr` 共用默认服务目录，不再要求 export；`start` 自动打开只读 Rerun。默认 reset 回准备姿态，不是六轴全零。旧目录服务请先按[迁移与复位说明](docs/harness_robowork.md#服务目录迁移可视化与-reset)迁移，迁移会重置场景。

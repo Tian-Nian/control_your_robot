@@ -102,7 +102,7 @@ def stop(*, quiet: bool = False) -> int:
     live = live_records()
     if not live:
         clear_dead_records()
-        _say("已停止", quiet=quiet)
+        _say(f"当前服务目录没有运行记录：{user_state_dir()}（未停止其他目录的服务）", quiet=quiet)
         return 0
     for record in live:
         _stop_one(record)

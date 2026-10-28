@@ -170,8 +170,7 @@ bash examples/piper_mujoco.sh status
 bash examples/piper_mujoco.sh agent
 ```
 
-The launcher always uses `.venv-harness` and `save/mujoco-runtime`, regardless of
-the shell's active environment. `agent` ensures the scene is started, opens Rerun,
+The launcher uses `.venv-harness` and inherits the same discovery directory as direct `cyr` commands (default `~/.local/state/cyr`). It no longer overrides `XDG_STATE_HOME`. `start` also ensures the read-only viewer is open. `agent` ensures the scene is started, opens Rerun,
 then attaches the visual loop. It preserves an already-running scene. Press
 **Enter in the agent terminal** to stop the agent; the scene/viewer remain open.
 Stop a prior agent before starting another: control leases are exclusive.
@@ -202,7 +201,7 @@ The equivalent lower-level commands require the same environment and directory:
 
 ```bash
 source .venv-harness/bin/activate
-export XDG_STATE_HOME="$PWD/save/mujoco-runtime"
+unset XDG_STATE_HOME  # 使用默认服务目录；仅旧服务迁移期间才使用旧路径
 cyr start --config config/runtime/piper_mujoco.yml
 python examples/piper_mujoco_agent.py --attach
 cyr stop
@@ -554,7 +553,7 @@ controller observation. In-memory history/evidence is bounded; disk audit/image
 logs accumulate. These logs do not provide cross-restart motion deduplication.
 Fixed physical tests produce `save/mujoco_<id>.jsonl` and `.pick.json`; these
 contain independent ground-truth evidence, not model observations. Viewer logs
-are in `save/mujoco-runtime/cyr/viewer.log`.
+are in `~/.local/state/cyr/viewer.log（自定义 XDG_STATE_HOME 时随其变化）`.
 
 | Symptom | Check / action |
 | --- | --- |

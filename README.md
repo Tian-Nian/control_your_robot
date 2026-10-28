@@ -351,3 +351,5 @@ Run `python examples/piper_harness.py` for an isolated Piper Sim task with fresh
 For the current RGB-D tool workspace, use the [current MuJoCo agent guide](docs/harness_robowork.md).
 
 MuJoCo exception: without a body adapter, the runtime uses the device’s local `solve_ik` for full flange position AND orientation. With motion tracking enabled, its `runtime_reset_target` is interpolated without blocking physics. These are distinct from the older body position-only IK and controller-specific reset implementations.
+
+The launcher now shares the default discovery directory with direct `cyr` and opens the read-only viewer on `start`. Default reset returns to READY, not all-zero joints. See [migration and reset instructions](docs/harness_robowork.md#服务目录迁移可视化与-reset) before migrating an older project-local service; migration resets the scene.
